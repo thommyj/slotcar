@@ -42,6 +42,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 
+
 --*****************************************************************************
 --*  DEFINE: Entity                                                           *
 --*****************************************************************************
@@ -52,17 +53,15 @@ entity sc_fpga is
          -- Input clock 
          --
          CLOCK_50    : in  std_logic;
-			LED_GREEN     : out   std_logic_vector(6 downto 0);
-         LED_HEARTBEAT : out   std_logic;
+			LED_GREEN     : out   std_logic_vector(7 downto 0);
          KEY           : in    std_logic_vector(1 downto 0);
          SW            : in    std_logic_vector(3 downto 0)
        );
 end entity sc_fpga;
 
-
 --*****************************************************************************
 --*  DEFINE: Architecture                                                     *
---*****************************************************************************
+--****************************************************************************
 
 architecture syn of sc_fpga is
 
@@ -83,6 +82,8 @@ architecture syn of sc_fpga is
    signal el_clk     : std_logic;
    signal pll_locked : std_logic;
    signal counter_data : std_logic_vector(31 downto 0) := (others => '0');  
+	signal saved_sw : std_logic_vector(3 downto 0) := (others => '0');
+   signal output : std_logic_vector(7 downto 0) := (others => '0');
   
 begin
 
@@ -95,14 +96,24 @@ begin
 
    process(el_clk)
    begin
-    
       if rising_edge(el_clk) then
-         counter_data <= std_logic_vector(unsigned(counter_data) + 1);
-      end if; 
-    
+		  if(SW = saved_sw) then
+          counter_data <= std_logic_vector(unsigned(counter_data) + 1);
+			 case SW is
+			   when "0000" => output <= counter_data(21 downto 14);
+				when others => output <= (others => counter_data(14));
+			 end case;
+		  else
+			 counter_data <= (others => '0');
+		    output <= (others => '0');
+		  end if;
+		saved_sw <= SW;  
+	   end if; 
    end process;
+	
   
-   LED_HEARTBEAT <= counter_data(21);
+   LED_GREEN <= output;
+	
 
 end architecture syn;
 

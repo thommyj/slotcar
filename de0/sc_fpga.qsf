@@ -69,6 +69,7 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CLOCK_50
 #============================================================
 # LED_GREEN
 #============================================================
+
 set_location_assignment PIN_A15 -to LED_GREEN[0]
 set_location_assignment PIN_A13 -to LED_GREEN[1]
 set_location_assignment PIN_B13 -to LED_GREEN[2]
@@ -76,7 +77,7 @@ set_location_assignment PIN_A11 -to LED_GREEN[3]
 set_location_assignment PIN_D1 -to LED_GREEN[4]
 set_location_assignment PIN_F3 -to LED_GREEN[5]
 set_location_assignment PIN_B1 -to LED_GREEN[6]
-set_location_assignment PIN_L3 -to LED_HEARTBEAT
+set_location_assignment PIN_L3 -to LED_GREEN[7]
 
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_GREEN[0]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_GREEN[1]
@@ -85,7 +86,7 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_GREEN[3]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_GREEN[4]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_GREEN[5]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_GREEN[6]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_HEARTBEAT
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LED_GREEN[7]
 
 set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to LED_GREEN[0]
 set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to LED_GREEN[1]
@@ -94,7 +95,7 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to LED_GREEN[3]
 set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to LED_GREEN[4]
 set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to LED_GREEN[5]
 set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to LED_GREEN[6]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to LED_HEARTBEAT
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to LED_GREEN[7]
 
 
 #============================================================
@@ -119,5 +120,8 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[0]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[1]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[2]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[3]
+
+
+set_global_assignment -name CDF_FILE output_files/Chain2.cdf
 
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
