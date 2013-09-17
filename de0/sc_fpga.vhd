@@ -52,10 +52,16 @@ entity sc_fpga is
 	      --
          -- Input clock 
          --
-         CLOCK_50    : in  std_logic;
-			LED_GREEN     : out   std_logic_vector(7 downto 0);
-         KEY           : in    std_logic_vector(1 downto 0);
-         SW            : in    std_logic_vector(3 downto 0)
+         CLOCK_50      : in  std_logic;
+			LED_GREEN     : out std_logic_vector(7 downto 0);
+         KEY           : in  std_logic_vector(1 downto 0);
+         SW            : in  std_logic_vector(3 downto 0);
+			RPI           : in  std_logic_vector(3 downto 0);
+			SS            : in  std_logic;
+			SCLK          : in  std_logic;
+			MOSI          : in  std_logic;
+			MISO          : in  std_logic
+			
        );
 end entity sc_fpga;
 
@@ -79,12 +85,11 @@ architecture syn of sc_fpga is
    --
    -- Define all local signals (like static data) here
    --
-   signal el_clk     : std_logic;
-   signal pll_locked : std_logic;
+   signal el_clk       : std_logic;
+   signal pll_locked   : std_logic;
    signal counter_data : std_logic_vector(31 downto 0) := (others => '0');  
-	signal saved_sw : std_logic_vector(3 downto 0) := (others => '0');
-   signal output : std_logic_vector(7 downto 0) := (others => '0');
-  
+	signal saved_sw     : std_logic_vector(3 downto 0) := (others => '0');
+   signal SPI_signals  : std_logic_vector(7 downto 0) := (others => '0');
 begin
 
    inst_pll : pll
@@ -99,22 +104,23 @@ begin
       if rising_edge(el_clk) then
 		  if(SW = saved_sw) then
           counter_data <= std_logic_vector(unsigned(counter_data) + 1);
-			 case SW is
-			   when "0000" => output <= counter_data(21 downto 14);
-				when others => output <= (others => counter_data(14));
-			 end case;
 		  else
 			 counter_data <= (others => '0');
-		    output <= (others => '0');
 		  end if;
 		saved_sw <= SW;  
 	   end if; 
    end process;
 	
   
-   LED_GREEN <= output;
+   SPI_signals(0) <= SS;
+	SPI_signals(1) <= MOSI;
+	SPI_signals(2) <= MISO;
+	SPI_signals(3) <= SCLK;
 	
-
+   LED_GREEN <= counter_data(21 downto 14) when saved_sw="0000" else
+                SPI_signals                when saved_sw="1111" else
+                (others => counter_data(14));
+   
 end architecture syn;
 
 -- *** EOF ***
