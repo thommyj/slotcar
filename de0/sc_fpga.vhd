@@ -60,7 +60,11 @@ entity sc_fpga is
 			SS            : in  std_logic;
 			SCLK          : in  std_logic;
 			MOSI          : in  std_logic;
-			MISO          : in  std_logic
+			MISO          : out std_logic;
+			SS_out        : out std_logic;
+			SCLK_out      : out std_logic;
+			MOSI_out      : out std_logic;
+			MISO_out      : out std_logic
 			
        );
 end entity sc_fpga;
@@ -111,11 +115,20 @@ begin
 	   end if; 
    end process;
 	
+	--loop all data back to master
+	MISO <= MOSI;
   
+   --collect all SPI signals in one array
    SPI_signals(0) <= SS;
 	SPI_signals(1) <= MOSI;
-	SPI_signals(2) <= MISO;
+	SPI_signals(2) <= MOSI;  --just loopback at the moment
 	SPI_signals(3) <= SCLK;
+	
+	--forward SPI signals to JP0
+	SS_out   <= SS;
+	MOSI_out <= MOSI;
+	SCLK_out <= SCLK;
+	MISO_out <= MOSI; --just loopback at the moment
 	
    LED_GREEN <= counter_data(21 downto 14) when saved_sw="0000" else
                 SPI_signals                when saved_sw="1111" else

@@ -133,6 +133,26 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SCLK
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to MISO
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to MOSI
 
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to MISO
+#============================================================
+# SPI forward
+#============================================================
+set_location_assignment PIN_D12 -to SS_out
+set_location_assignment PIN_B12 -to SCLK_out
+set_location_assignment PIN_A12 -to MISO_out
+set_location_assignment PIN_D11 -to MOSI_out
+
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SS_out
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SCLK_out
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to MISO_out
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to MOSI_out
+
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to SS_out
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to SCLK_out
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to MISO_out
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to MOSI_out
+
 #============================================================
 # GPIO RPI
 #============================================================
@@ -151,6 +171,7 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SS
 
 
 set_global_assignment -name CDF_FILE output_files/Chain2.cdf
+
 
 
 
