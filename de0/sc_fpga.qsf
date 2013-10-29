@@ -124,14 +124,15 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[3]
 #============================================================
 # SPI
 #============================================================
-set_location_assignment PIN_N15 -to SS
-set_location_assignment PIN_P14 -to SCLK
-set_location_assignment PIN_N14 -to MISO
-set_location_assignment PIN_L13 -to MOSI
+set_location_assignment PIN_N15 -to SS_async
+set_location_assignment PIN_P14 -to SCLK_async
+set_location_assignment PIN_N14 -to MISO_async
+set_location_assignment PIN_L13 -to MOSI_async
 
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SCLK
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to MISO
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to MOSI
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SS_async
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SCLK_async
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to MISO_async
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to MOSI_async
 
 
 set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to MISO
@@ -167,7 +168,6 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to RPI[2]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to RPI[3]
 
 
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SS
 
 
 set_global_assignment -name CDF_FILE output_files/Chain2.cdf

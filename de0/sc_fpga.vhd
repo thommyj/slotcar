@@ -12,19 +12,19 @@
 --*     documentation and/or other materials provided with the distribution.
 --*  3. Neither the name of the author nor the names of its contributors may 
 --*     be used to endorse or promote products derived from this software 
---*     without specific prior written permission.
+--*     without specific prior written permiSS_asyncion.
 --*
 --*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
---*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
---*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
+--*  "AS IS" AND ANY EXPRESS_async OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
+--*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS_async 
 --*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL 
 --*  THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, 
 --*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
---*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS 
---*  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED 
+--*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS_async 
+--*  OF USE, DATA, OR PROFITS; OR BUSINESS_async INTERRUPTION) HOWEVER CAUSED 
 --*  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
 --*  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF 
---*  THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
+--*  THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSS_asyncIBILITY OF 
 --*  SUCH DAMAGE.
 --*
 --*****************************************************************************
@@ -57,10 +57,10 @@ entity sc_fpga is
          KEY           : in  std_logic_vector(1 downto 0);
          SW            : in  std_logic_vector(3 downto 0);
 			RPI           : in  std_logic_vector(3 downto 0);
-			SS            : in  std_logic;
-			SCLK          : in  std_logic;
-			MOSI          : in  std_logic;
-			MISO          : out std_logic;
+			SS_async      : in  std_logic;
+			SCLK_async    : in  std_logic;
+			MOSI_async    : in  std_logic;
+			MISO_async    : out std_logic;
 			SS_out        : out std_logic;
 			SCLK_out      : out std_logic;
 			MOSI_out      : out std_logic;
@@ -94,6 +94,11 @@ architecture syn of sc_fpga is
    signal counter_data : std_logic_vector(31 downto 0) := (others => '0');  
 	signal saved_sw     : std_logic_vector(3 downto 0) := (others => '0');
    signal SPI_signals  : std_logic_vector(7 downto 0) := (others => '0');
+	signal last_SCLK    : std_logic;
+	
+	signal sreg  		  : std_logic_vector(7 downto 0) := (others => '0');
+	signal SCLK_delayed : std_logic := '0';
+	signal SCLK 	     : std_logic := '0';
 begin
 
    inst_pll : pll
@@ -103,32 +108,60 @@ begin
                  locked => pll_locked
                );
 
-   process(el_clk)
-   begin
-      if rising_edge(el_clk) then
-		  if(SW = saved_sw) then
-          counter_data <= std_logic_vector(unsigned(counter_data) + 1);
-		  else
-			 counter_data <= (others => '0');
-		  end if;
-		saved_sw <= SW;  
+					
+	process(el_clk)
+		
+   begin	
+		if rising_edge(el_clk) then
+			SCLK <= SCLK_delayed;
+			SCLK_delayed <= SCLK_async;
+		end if;
+	end process;
+	
+	
+	process(el_clk)
+		
+   begin	
+		if rising_edge(el_clk) then
+			if(SW = saved_sw) then
+				counter_data <= std_logic_vector(unsigned(counter_data) + 1);
+			else
+				counter_data <= (others => '0');
+			end if;
+			
+			
+			if(last_SCLK = '0' and SCLK = '1') then -- Sample Time (Up Flank)
+				if(SS_async = '0') then
+					sreg(7) <= MOSI_async;
+					sreg(6 downto 0) <= sreg(7 downto 1);
+				end if;
+			elsif(last_SCLK = '1' and SCLK = '0') then -- (Down Flank)	
+				if(SS_async = '0') then
+					MISO_async <= sreg(0);--MOSI_async;	
+				end if;
+			end if;
+			
+			last_SCLK <= SCLK;
+			saved_sw <= SW;  
 	   end if; 
    end process;
 	
 	--loop all data back to master
-	MISO <= MOSI;
+--	MISO <= MOSI_async;
   
    --collect all SPI signals in one array
-   SPI_signals(0) <= SS;
-	SPI_signals(1) <= MOSI;
-	SPI_signals(2) <= MOSI;  --just loopback at the moment
-	SPI_signals(3) <= SCLK;
+   SPI_signals(0) <= SS_async;
+	SPI_signals(1) <= MOSI_async;
+	
+	
+	SPI_signals(2) <= MOSI_async;  --just loopback at the moment
+	SPI_signals(3) <= SCLK_async;
 	
 	--forward SPI signals to JP0
-	SS_out   <= SS;
-	MOSI_out <= MOSI;
-	SCLK_out <= SCLK;
-	MISO_out <= MOSI; --just loopback at the moment
+	SS_out   <= SS_async;
+	MOSI_out <= MOSI_async;
+	SCLK_out <= SCLK_async;
+	MISO_out <= MOSI_async; --just loopback at the moment
 	
    LED_GREEN <= counter_data(21 downto 14) when saved_sw="0000" else
                 SPI_signals                when saved_sw="1111" else
