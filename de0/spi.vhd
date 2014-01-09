@@ -57,8 +57,8 @@ entity spi is
 			MISO_async     : out std_logic;
 			data_out       : buffer std_logic_vector(7 downto 0);
 			data_in        : in  std_logic_vector(7 downto 0);
-			data_out_valid : buffer std_logic;
-			data_in_valid  : in std_logic
+			data_out_valid : buffer std_logic
+--			data_in_valid  : in std_logic
        );
 end entity spi;
 
@@ -124,14 +124,14 @@ begin
 	--
 	-- clock new data in from decoder when valid is high
 	--
-	process(clk)
-	begin	
-		if rising_edge(clk) then
-	      if(data_in_valid = '1') then
-			   data_to_send <= data_in;
-		   end if;
-		end if;
-	end process;
+	--process(clk)
+	--begin	
+	--	if rising_edge(clk) then
+	--      if(data_in_valid = '1') then
+data_to_send <= data_in;
+--		   end if;
+--		end if;
+--	end process;
 	
 	data_out_valid <= '1' when receive_cnt=8 else
                      '0'; 

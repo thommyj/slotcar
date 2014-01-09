@@ -92,30 +92,29 @@ architecture syn of sc_fpga is
 			MISO_async     : out std_logic;
 			data_out       : buffer std_logic_vector(7 downto 0);
 			data_in        : in  std_logic_vector(7 downto 0);
-         data_out_valid : buffer std_logic;
-			data_in_valid  : in std_logic
+         data_out_valid : buffer std_logic
        );
 	end component;
 		 
 	component spi_decoder
-	   port( 
-         clk              : in  std_logic;
-			rst              : in  std_logic;
-			spidata_out      : out std_logic_vector(7 downto 0);
-			spidata_in       : in  std_logic_vector(7 downto 0);
-			spidata_valid_out : out std_logic;
-			spidata_valid_in  : in std_logic
+		port( 
+         clk               : in  std_logic;
+			rst               : in  std_logic;
+			spidata_out       : out std_logic_vector(7 downto 0);
+			spidata_in        : in  std_logic_vector(7 downto 0);
+			spidata_valid_in  : in  std_logic;
+			pll_locked        : in  std_logic;
+			version           : in  std_logic_vector(7 downto 0)
        );
-    end component;
+	end component;
 		 
-		 signal clk                       : std_logic;
-		 signal rst                       : std_logic;
-		 signal pll_locked                : std_logic;
-		 signal spidata_from_master       : std_logic_vector(7 downto 0);
-		 signal spidata_to_master         : std_logic_vector(7 downto 0); 
-		 signal spidata_valid_to_master   : std_logic;
-		 signal spidata_valid_from_master : std_logic;
-		 
+	 signal clk                       : std_logic;
+	 signal rst                       : std_logic;
+	 signal pll_locked                : std_logic;
+	 signal spidata_from_master       : std_logic_vector(7 downto 0);
+	 signal spidata_to_master         : std_logic_vector(7 downto 0); 
+	 signal spidata_valid_from_master : std_logic;
+	 constant VERSION                 : std_logic_vector(7 downto 0):= "00001000";
 
 begin
 
@@ -136,18 +135,18 @@ begin
 			        MISO_async => MISO_async,
 			        data_out   => spidata_from_master,
 			        data_in    => spidata_to_master,
-			        data_in_valid => spidata_valid_to_master,
 					  data_out_valid => spidata_valid_from_master
                );
 					
 	inst_spi_decoder : spi_decoder
       port map (
-                 clk => clk,
-			        rst => rst,
-			        spidata_out => spidata_to_master,
-			        spidata_in => spidata_from_master,
-			        spidata_valid_out => spidata_valid_to_master,
-					  spidata_valid_in => spidata_valid_from_master
+						clk => clk,
+						rst => rst,
+						spidata_out => spidata_to_master,
+						spidata_in => spidata_from_master,
+						spidata_valid_in => spidata_valid_from_master,
+						pll_locked => pll_locked,
+						version => VERSION
                );
 					
      SS_out   <= '0';
