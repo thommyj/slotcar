@@ -105,7 +105,12 @@ architecture syn of sc_fpga is
 			spidata_valid_in  : in  std_logic;
 			leds					: out std_logic_vector(7 downto 0);
 			pll_locked        : in  std_logic;
-			version           : in  std_logic_vector(7 downto 0)
+			version           : in  std_logic_vector(7 downto 0);
+			extreg_dataout		: out std_logic_vector(7 downto 0);
+			extreg_addressout	: out std_logic_vector(7 downto 0);
+			extreg_enable		: out std_logic;
+			extreg_datain		: in std_logic_vector(7 downto 0);
+			extreg_addressin	: out std_logic_vector(7 downto 0)
        );
 	end component;
 	
@@ -160,14 +165,19 @@ begin
 					
 	inst_spi_decoder : spi_decoder
       port map (
-						clk => clk,
-						rst => rst,
-						spidata_out => spidata_to_master,
-						spidata_in => spidata_from_master,
-						spidata_valid_in => spidata_valid_from_master,
-						pll_locked => pll_locked,
-						version => VERSION,
-						leds => LED_GREEN
+						clk 					=> clk,
+						rst 					=> rst,
+						spidata_out 		=> spidata_to_master,
+						spidata_in 			=> spidata_from_master,
+						spidata_valid_in 	=> spidata_valid_from_master,
+						pll_locked 			=> pll_locked,
+						version 				=> VERSION,
+						leds 					=> LED_GREEN,
+						extreg_dataout		=> rs485data_from_powerbase, --should later come from rs485 block
+						extreg_addressout	=> rs485address_from_powerbase, --should later come from rs485 block
+						extreg_enable		=> rs485data_enable,
+						extreg_datain		=> rs485data_to_spi,
+						extreg_addressin	=> rs485address_to_spi
                );
 					
    inst_registerfile : registerfile
