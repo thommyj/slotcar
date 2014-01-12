@@ -53,6 +53,7 @@ entity spi_decoder is
 			spidata_out       : out std_logic_vector(7 downto 0);
 			spidata_in        : in  std_logic_vector(7 downto 0);
 			spidata_valid_in  : in  std_logic;
+			leds					: out std_logic_vector(7 downto 0);
 			pll_locked        : in  std_logic;
 			version           : in  std_logic_vector(7 downto 0)
        );
@@ -67,10 +68,20 @@ architecture syn of spi_decoder is
    --
    -- Define all local signals (like static data) here
    --
-	type state_type is (idle_state,write_state,read_state);
+	type state_type is (SPISTATE_IDLE,SPISTATE_WRITE,SPISTATE_READ);
+	type out_content_type is (SPIOUT_OK, SPIOUT_ERROR, SPIOUT_INTERNAL, SPIOUT_EXTERNAL);
+	
 	signal state : state_type;
+	signal out_content : out_content_type;
+	
+	--received command from peer
 	signal rec_cmd : std_logic_vector(7 downto 0);
-   signal status : std_logic_vector(7 downto 0);
+	--internal registers
+   signal status_reg : std_logic_vector(7 downto 0);
+	signal config_reg : std_logic_vector(7 downto 0);
+	signal led_reg    : std_logic_vector(7 downto 0);
+	signal int_reg_muxout: std_logic_vector(7 downto 0);
+	
 	
 	--Protocol
 	--First byte is the command, MSB sent first
@@ -84,8 +95,12 @@ architecture syn of spi_decoder is
    --	During second byte, if command was a write, 0xAA is returned if command was ok. Otherwise 0xFF if an error was found
 	
 	--Internal registers
-	---0x00, version register (read only)
-	---0x01, status (read only)
+	---0x00, version register r
+	---0x01, status r
+	---0x02, config r/w,
+	----bit7 - 1, reserved
+	----bit0, led output. 1b0 = spi data from master, 1b0 = led register
+	---0x03, leds r/w
 	
 	--External registers
 	---
@@ -96,51 +111,46 @@ process(clk)
 begin	
 	if rising_edge(clk) then
 		if (rst = '1') then
-			state <= idle_state;
-			spidata_out <= x"AA";
+			state <= SPISTATE_IDLE;
+			out_content <= SPIOUT_OK;
+			config_reg <= "00000000";
+			led_reg <= "00000000";
 		else
 			case state is
 			---------IDLE--------------
-			when idle_state =>
+			when SPISTATE_IDLE =>
 				--command received?
 				if (spidata_valid_in = '1') then
 					rec_cmd <= spidata_in;
 						 
 					--if MSB is set, command is write 	 
 					if (spidata_in(7) = '1') then
-						state <= write_state;
-						spidata_out <= x"AA";
+						state <= SPISTATE_WRITE;
+						out_content <= SPIOUT_OK;
 					else --otherwise command is read
-						state <= read_state;						
+						state <= SPISTATE_READ;						
 						--internal read if bit 6 is set
 						if(spidata_in(6) = '1') then 
-							case spidata_in(5 downto 0) is
-								when "000000" =>
-									spidata_out <= version;
-								when "000001" =>
-									spidata_out <= status;
-								when others =>
-									spidata_out <= x"FF";
-								end case;
+							out_content <= SPIOUT_INTERNAL;
 						else --external registers
-							spidata_out <= x"FF"; --TODO: add external registers
+							out_content <= SPIOUT_EXTERNAL;
 						end if;
 					end if;
 				end if;
 						 
 			----------WRITE--------------	 
-			when write_state =>
+			when SPISTATE_WRITE =>
 				--if data write
 				if (spidata_valid_in = '1') then
 					--TODO send to external
 				end if;
 						 
 			----------READ--------------	 
-			when read_state =>
+			when SPISTATE_READ =>
 				--when second byte is received, peer has alread read data
 				if (spidata_valid_in = '1') then
-					state <= idle_state;
-					spidata_out <= x"AA";
+					state <= SPISTATE_IDLE;
+					out_content <= SPIOUT_OK;
 				end if;
 				
 			end case;
@@ -148,8 +158,27 @@ begin
 	end if; --if clk
 end process;
 	
-	status <= "0000000" & pll_locked;
+	status_reg <= "0000000" & pll_locked;
 	   
+	with out_content select
+		spidata_out <= x"AA" 			when SPIOUT_OK,
+							x"FF" 			when SPIOUT_ERROR,
+							int_reg_muxout when SPIOUT_INTERNAL,
+							x"FF" 			when SPIOUT_EXTERNAL; --TODO add external register
+							
+	with rec_cmd(5 downto 0) select
+		int_reg_muxout <= version		when "000000",
+								status_reg	when "000001",
+								config_reg	when "000010",
+								led_reg		when "000011", 
+								x"FF" when others;
+								
+	with config_reg(0) select
+		leds <= 	spidata_in	when '0',
+					led_reg		when '1';
+					
+							
+	
 end architecture syn;
 
 -- *** EOF ***
