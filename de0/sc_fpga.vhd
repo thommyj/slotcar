@@ -108,6 +108,20 @@ architecture syn of sc_fpga is
 			version           : in  std_logic_vector(7 downto 0)
        );
 	end component;
+	
+	component registerfile is
+   port( 
+         clk				: in  std_logic;
+			rst				: in	std_logic;
+			
+			writer_data		: in  std_logic_vector(7 downto 0);
+			writer_address	: in  std_logic_vector(7 downto 0);
+			writer_enable	: in  std_logic;
+			
+			reader_data    : out std_logic_vector(7 downto 0);
+			reader_address : in  std_logic_vector(7 downto 0)
+       );
+	end component;
 		 
 	 signal clk                       	: std_logic;
 	 signal rst                       	: std_logic;
@@ -116,6 +130,11 @@ architecture syn of sc_fpga is
 	 signal spidata_to_master         	: std_logic_vector(7 downto 0); 
 	 signal spidata_valid_from_master 	: std_logic;
 	 constant VERSION                 	: std_logic_vector(7 downto 0):= "00001000";
+	 signal rs485data_from_powerbase		: std_logic_vector(7 downto 0);
+	 signal rs485address_from_powerbase	: std_logic_vector(7 downto 0);
+	 signal rs485data_enable				: std_logic;
+	 signal rs485data_to_spi				: std_logic_vector(7 downto 0);
+	 signal rs485address_to_spi			: std_logic_vector(7 downto 0);
 
 begin
 
@@ -150,6 +169,17 @@ begin
 						version => VERSION,
 						leds => LED_GREEN
                );
+					
+   inst_registerfile : registerfile
+		port map( 
+						clk				=> clk,
+						rst				=> rst,
+						writer_data		=> rs485data_from_powerbase,
+						writer_address	=> rs485address_from_powerbase,
+						writer_enable	=> rs485data_enable,
+						reader_data		=> rs485data_to_spi,
+						reader_address => rs485address_to_spi
+       );
 					
      SS_out   <= '0';
 	  SCLK_out <= '0';
