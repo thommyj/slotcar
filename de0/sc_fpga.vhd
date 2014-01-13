@@ -130,6 +130,7 @@ architecture syn of sc_fpga is
 		 
 	 signal clk                       	: std_logic;
 	 signal rst                       	: std_logic;
+	 signal rst_cnt				       	: std_logic_vector(15 downto 0):= "0000000000000000";
 	 signal pll_locked                	: std_logic;
 	 signal spidata_from_master       	: std_logic_vector(7 downto 0);
 	 signal spidata_to_master         	: std_logic_vector(7 downto 0); 
@@ -190,14 +191,26 @@ begin
 						reader_data		=> rs485data_to_spi,
 						reader_address => rs485address_to_spi
        );
-					
-     SS_out   <= '0';
-	  SCLK_out <= '0';
-	  MOSI_out <= '0';
-	  MISO_out <= '0';
-	  
-	  rst <= '0';
-	
+
+		 
+--async trigg of reset, sync release
+process(clk,pll_locked)
+begin
+	if(pll_locked = '1')	then
+		rst <= '1';
+	elsif(clk'event and clk = '1') then
+		if(rst_cnt = x"FFFF") then
+			rst <= '0';
+		else
+			rst_cnt = rst_cnt + 1;
+		end if;
+	end if;
+end process;	
+					     
+	SS_out   <= '0';
+	SCLK_out <= '0';
+	MOSI_out <= '0';
+	MISO_out <= '0';
    
 end architecture syn;
 
