@@ -78,14 +78,16 @@ architecture syn of spi is
 	signal receive_cnt  : integer := 0;
 	
 begin
-					
-	process(clk)
-		
+
 	--
 	-- remove metastabilty on SCLK
 	--
-   begin	
-		if rising_edge(clk) then
+	process(clk,rst)
+   begin
+		if rst = '1' then
+			SCLK <= '0';
+			SCLK_delayed <= '0';
+		elsif rising_edge(clk) then
 			SCLK <= SCLK_delayed;
 			SCLK_delayed <= SCLK_async;
 		end if;
@@ -96,10 +98,12 @@ begin
 	-- shift in values from RPI when up flank is detected on SCLK
 	-- shift out values to RPI when down flank is detected on SCLK
 	--
-	process(clk)
-	begin	
-		if rising_edge(clk) then
-		
+	process(clk,rst)
+	begin
+		if rst = '1' then
+				SCLK_saved   <= '0';
+				receive_cnt  <= 0;
+		elsif rising_edge(clk) then
 		   if(receive_cnt = 8) then
 			   receive_cnt <= 0;
 		   end if;

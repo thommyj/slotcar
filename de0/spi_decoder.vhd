@@ -87,8 +87,8 @@ architecture syn of spi_decoder is
 	signal rec_cmd : std_logic_vector(7 downto 0);
 	--internal registers
    signal status_reg : std_logic_vector(7 downto 0);
-	signal config_reg : std_logic_vector(7 downto 0);
-	signal led_reg    : std_logic_vector(7 downto 0);
+	signal config_reg : std_logic_vector(7 downto 0) := "00000000";
+	signal led_reg    : std_logic_vector(7 downto 0) := "00000000";
 	
 	--local copies of output
 	signal int_reg_muxout: std_logic_vector(7 downto 0);
@@ -119,66 +119,62 @@ architecture syn of spi_decoder is
 	
 begin
 					
-process(clk)
-begin	
-	if rising_edge(clk) then
-		if (rst = '1') then
-			state <= SPISTATE_IDLE;
-			out_content <= SPIOUT_OK;
-			config_reg 	<= "00000000";
-			led_reg 		<= "00000000";
-		else
-			case state is
-			---------IDLE--------------
-			when SPISTATE_IDLE =>
-				--command received?
-				if (spidata_valid_in = '1') then
-					rec_cmd <= spidata_in;
-						 
-					--if MSB is set, command is write 	 
-					if (spidata_in(7) = '1') then
-						state <= SPISTATE_WRITE;
-						out_content <= SPIOUT_OK;
-					else --otherwise command is read			
-						--internal read if bit 6 is set
-						if(spidata_in(6) = '1') then 
-							state <= SPISTATE_READ_WAITFORDONE;			
-							out_content <= SPIOUT_INTERNAL;
-						else --external registers, need an extra clkcycle
-							state <= SPISTATE_READ_WAITFORDATA;			
-							out_content <= SPIOUT_ERROR;
-							--in reality even fewer registers, but we have 6 address bits
-							--so lets send them. If user exceeds limits register file will
-							--send error
-							extreg_addressin <= "00" & spidata_in(5 downto 0);
-						end if;
+process(clk,rst)
+begin
+	if (rst = '1') then
+		state <= SPISTATE_IDLE;
+		out_content <= SPIOUT_OK;
+	elsif rising_edge(clk) then
+		case state is
+		---------IDLE--------------
+		when SPISTATE_IDLE =>
+			--command received?
+			if (spidata_valid_in = '1') then
+				rec_cmd <= spidata_in;
+					 
+				--if MSB is set, command is write 	 
+				if (spidata_in(7) = '1') then
+					state <= SPISTATE_WRITE;
+					out_content <= SPIOUT_OK;
+				else --otherwise command is read			
+					--internal read if bit 6 is set
+					if(spidata_in(6) = '1') then 
+						state <= SPISTATE_READ_WAITFORDONE;			
+						out_content <= SPIOUT_INTERNAL;
+					else --external registers, need an extra clkcycle
+						state <= SPISTATE_READ_WAITFORDATA;			
+						out_content <= SPIOUT_ERROR;
+						--in reality even fewer registers, but we have 6 address bits
+						--so lets send them. If user exceeds limits register file will
+						--send error
+						extreg_addressin <= "00" & spidata_in(5 downto 0);
 					end if;
 				end if;
-						 
-			----------WRITE--------------	 
-			when SPISTATE_WRITE =>
-				--if data write
-				if (spidata_valid_in = '1') then
-					--TODO add write
-				end if;
-						 
-			----------READ--------------	 
-			when SPISTATE_READ_WAITFORDONE =>
-				--when second byte is received, peer has alread read data
-				if (spidata_valid_in = '1') then
-					state <= SPISTATE_IDLE;
-					out_content <= SPIOUT_OK;
-				end if;
-			when SPISTATE_READ_WAITFORDATA =>
-				--address to registerfile was put out last cycle,
-				--data should be available now
-				ext_reg_out <= extreg_datain;
-				state <= SPISTATE_READ_WAITFORDONE;
-				out_content <= SPIOUT_EXTERNAL;
-				
-			end case;
-		end if; --if reset
-	end if; --if clk
+			end if;
+					 
+		----------WRITE--------------	 
+		when SPISTATE_WRITE =>
+			--if data write
+			if (spidata_valid_in = '1') then
+				--TODO add write
+			end if;
+					 
+		----------READ--------------	 
+		when SPISTATE_READ_WAITFORDONE =>
+			--when second byte is received, peer has alread read data
+			if (spidata_valid_in = '1') then
+				state <= SPISTATE_IDLE;
+				out_content <= SPIOUT_OK;
+			end if;
+		when SPISTATE_READ_WAITFORDATA =>
+			--address to registerfile was put out last cycle,
+			--data should be available now
+			ext_reg_out <= extreg_datain;
+			state <= SPISTATE_READ_WAITFORDONE;
+			out_content <= SPIOUT_EXTERNAL;
+			
+		end case;
+	end if; --if reset
 end process;
 	
 	status_reg <= "0000000" & pll_locked;

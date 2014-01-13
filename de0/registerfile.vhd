@@ -74,30 +74,28 @@ architecture syn of registerfile is
 	
 begin
 					
-process(clk)
-begin	
-	if rising_edge(clk) then
-		if (rst = '1') then
-			registers <= (others=> (others=>'0'));
+process(clk,rst)
+begin
+	if(rst = '1') then 
+		registers <= (others=> (others=>'0'));
+	elsif rising_edge(clk) then
+		--put out requested data
+		if(to_integer(unsigned(reader_address)) > 22) then
+			reader_data <= x"FF";
 		else
-			--put out requested data
-			if(to_integer(unsigned(reader_address)) > 22) then
-				reader_data <= x"FF";
-			else
-				reader_data <= registers(to_integer(unsigned(reader_address)));
+			reader_data <= registers(to_integer(unsigned(reader_address)));
+		end if;
+		
+		--if write request from writer
+		if (writer_enable = '1') then
+			if(to_integer(unsigned(writer_address)) < 23) then
+				registers(to_integer(unsigned(writer_address))) <= writer_data;
 			end if;
 			
-			--if write request from writer
-			if (writer_enable = '1') then
-				if(to_integer(unsigned(writer_address)) < 23) then
-					registers(to_integer(unsigned(writer_address))) <= writer_data;
-				end if;
-				
-				--if reader request same address as writer is write to,
-				--shortcut data
-				if(reader_address = writer_address) then
-					reader_data <= writer_data;
-				end if;
+			--if reader request same address as writer is write to,
+			--shortcut data
+			if(reader_address = writer_address) then
+				reader_data <= writer_data;
 			end if;
 		end if;
 	end if;

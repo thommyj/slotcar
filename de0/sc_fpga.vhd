@@ -39,8 +39,7 @@
 --*****************************************************************************
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.NUMERIC_STD.ALL;
-
+use IEEE.std_logic_unsigned.ALL;
 
 
 --*****************************************************************************
@@ -202,7 +201,7 @@ begin
 		if(rst_cnt = x"FFFF") then
 			rst <= '0';
 		else
-			rst_cnt = rst_cnt + 1;
+			rst_cnt <= rst_cnt + 1;
 		end if;
 	end if;
 end process;	
