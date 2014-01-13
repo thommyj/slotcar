@@ -84,7 +84,8 @@ architecture syn of spi_decoder is
 	signal out_content : out_content_type;
 	
 	--received command from peer
-	signal rec_cmd : std_logic_vector(7 downto 0);
+	signal rec_cmd  : std_logic_vector(7 downto 0);
+	signal rec_data : std_logic_vector(7 downto 0);
 	--internal registers
    signal status_reg : std_logic_vector(7 downto 0);
 	signal config_reg : std_logic_vector(7 downto 0) := "00000000";
@@ -124,7 +125,17 @@ begin
 	if (rst = '1') then
 		state <= SPISTATE_IDLE;
 		out_content <= SPIOUT_OK;
+		
+		config_reg <= (others=>'0');
+		led_reg    <= (others=>'0');
+		
+		extreg_dataout		<= (others => '0');
+		extreg_addressout	<= (others => '0');
+		extreg_enable		<= '0';
+	
 	elsif rising_edge(clk) then
+		extreg_enable		<= '0'; --external write only needs one cycle
+		
 		case state is
 		---------IDLE--------------
 		when SPISTATE_IDLE =>
@@ -154,15 +165,34 @@ begin
 					 
 		----------WRITE--------------	 
 		when SPISTATE_WRITE =>
-			--if data write
+			--if peer writes data
 			if (spidata_valid_in = '1') then
-				--TODO add write
+				rec_data <= spidata_in;
+				state <= SPISTATE_IDLE;
+				out_content <= SPIOUT_OK;
+				
+				--internal
+				if(rec_cmd(6) = '1') then
+					case rec_cmd(5 downto 0) is
+						when "000010" =>
+							config_reg <= rec_data;
+						when "000011" =>
+							led_reg    <= rec_data;
+						when others =>
+					end case;
+				--external
+				else
+					extreg_dataout		<= spidata_in;
+					extreg_addressout	<= "00" & rec_cmd(5 downto 0);
+					extreg_enable		<= '1';
+				end if;
 			end if;
 					 
 		----------READ--------------	 
 		when SPISTATE_READ_WAITFORDONE =>
 			--when second byte is received, peer has alread read data
 			if (spidata_valid_in = '1') then
+				rec_data <= spidata_in;
 				state <= SPISTATE_IDLE;
 				out_content <= SPIOUT_OK;
 			end if;
@@ -196,12 +226,6 @@ end process;
 		leds <= 	spidata_in	when '0',
 					led_reg		when '1';
 	
-	
-	--write is not supported at the moment
-	extreg_dataout		<= (others => '0');
-	extreg_addressout	<= (others => '0');
-	extreg_enable		<= '0';
-							
 	
 end architecture syn;
 
