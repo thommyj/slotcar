@@ -96,10 +96,13 @@ architecture syn of spi_decoder is
 	signal ext_reg_out: std_logic_vector(7 downto 0);
 	
 	
+	signal led_states: std_logic_vector(7 downto 0);
+
 	--Protocol
 	--First byte is the command, MSB sent first
 	---bit7 = r/w (w=1b1)
 	---bit6 = internal registers (1b1)/slotcar registers (1b0)
+	--bit5-0 = address
 	--Second byte is data, MSB sent first. Peer is assumed to wait "long enough" before reading/writing data 
 	---If command is a read, Peer should send 0xAA (OK) as second command
 	
@@ -111,8 +114,8 @@ architecture syn of spi_decoder is
 	---0x00, version register r
 	---0x01, status r
 	---0x02, config r/w,
-	----bit7 - 1, reserved
-	----bit0, led output. 1b0 = spi data from master, 1b0 = led register
+	   --bit7 - 1, reserved
+	   --bit0, led output. 1b0 = spi data from master, 1b1 = led register
 	---0x03, leds r/w
 	
 	--External registers
@@ -175,9 +178,9 @@ begin
 				if(rec_cmd(6) = '1') then
 					case rec_cmd(5 downto 0) is
 						when "000010" =>
-							config_reg <= rec_data;
+							config_reg <= spidata_in;
 						when "000011" =>
-							led_reg    <= rec_data;
+							led_reg    <= spidata_in;
 						when others =>
 					end case;
 				--external
@@ -223,10 +226,14 @@ end process;
 								x"FF" when others;
 								
 	with config_reg(0) select
-		leds <= 	spidata_in	when '0',
+		leds <= 	led_states	when '0',
 					led_reg		when '1';
-	
-	
+
+	with state select
+		led_states <= x"01" when SPISTATE_IDLE,
+				    x"02" when SPISTATE_WRITE,
+					 x"04" when SPISTATE_READ_WAITFORDONE,
+					 x"08" when SPISTATE_READ_WAITFORDATA;
 end architecture syn;
 
 -- *** EOF ***

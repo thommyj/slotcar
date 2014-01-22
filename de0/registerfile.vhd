@@ -69,7 +69,7 @@ architecture syn of registerfile is
    --
    -- Define all local signals (like static data) here
    --
-	type registers_type is array(0 to 22) of std_logic_vector(7 downto 0); --9 + 14 bytes
+	type registers_type is array(0 to 255) of std_logic_vector(7 downto 0); --9 + 14 bytes??
 	signal registers : registers_type;
 	
 begin
@@ -79,12 +79,6 @@ begin
 	if(rst = '1') then 
 		registers <= (others=> (others=>'0'));
 	elsif rising_edge(clk) then
-		--put out requested data
-		if(to_integer(unsigned(reader_address)) > 22) then
-			reader_data <= x"FF";
-		else
-			reader_data <= registers(to_integer(unsigned(reader_address)));
-		end if;
 		
 		--if write request from writer
 		if (writer_enable = '1') then
@@ -94,13 +88,14 @@ begin
 			
 			--if reader request same address as writer is write to,
 			--shortcut data
-			if(reader_address = writer_address) then
-				reader_data <= writer_data;
-			end if;
+			--if(reader_address = writer_address) then
+			--	reader_data <= writer_data;
+			--end if;
 		end if;
 	end if;
 end process;
-	
-	
+
+reader_data <= registers(to_integer(unsigned(reader_address)));
+
 end architecture syn;
 -- *** EOF ***

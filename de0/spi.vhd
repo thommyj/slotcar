@@ -110,14 +110,16 @@ begin
 			
 			if(SCLK_saved = '0' and SCLK = '1') then -- Sample Time (Up Flank)
 				if(SS_async = '0') then
-					data_out(7) <= MOSI_async;
-					data_out(6 downto 0) <= data_out(7 downto 1);
+					data_out(0) <= MOSI_async;
+					data_out(7 downto 1) <= data_out(6 downto 0);
 					receive_cnt <= receive_cnt + 1;
 				end if;
 			elsif(SCLK_saved = '1' and SCLK = '0') then -- (Down Flank)	
 				if(SS_async = '0') then
-					MISO_async <= data_to_send(receive_cnt);--MOSI_async;	
+					MISO_async <= data_to_send(7-receive_cnt);
 				end if;
+		   elsif(receive_cnt = 0) then
+				MISO_async <= data_to_send(7);	
 			end if;
 			
 			SCLK_saved <= SCLK;
@@ -128,14 +130,16 @@ begin
 	--
 	-- clock new data in from decoder when valid is high
 	--
-	--process(clk)
+	--process(clk,rst)
 	--begin	
-	--	if rising_edge(clk) then
-	--      if(data_in_valid = '1') then
-data_to_send <= data_in;
---		   end if;
---		end if;
---	end process;
+		--if rst='1' then
+			--data_to_send <= x"F0";
+		--elsif rising_edge(clk) then
+	    --  if(data_out_valid = '1') then
+					data_to_send <= data_in;
+		   --end if;
+		--end if;
+	--end process;
 	
 	data_out_valid <= '1' when receive_cnt=8 else
                      '0'; 

@@ -195,7 +195,7 @@ begin
 --async trigg of reset, sync release
 process(clk,pll_locked)
 begin
-	if(pll_locked = '1')	then
+	if(pll_locked = '0')	then
 		rst <= '1';
 	elsif(clk'event and clk = '1') then
 		if(rst_cnt = x"FFFF") then
