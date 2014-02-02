@@ -2,7 +2,8 @@
 
 TEST=sed -e "s/\(\/[^:]*\)/`echo '\033[34;1m\\\\1\033[0m'`/g"  -e "s/\(:[0-9]*:[0-9]*:\)/`echo '\033[37m\\\\1\033[0m'`/g" -e "s/\(error\)/`echo '\033[31;1m\\\\1\033[0m'`/g" -e "s/\(note\)/`echo '\033[32;1m\\\\1\033[0m'`/g" -e "s/\(warning\)/`echo '\033[35m\\\\1\033[0m'`/g" -e "s/\(\‘[^\’]*\’\)/`echo '\033[38;1m\\\\1\033[0m'`/g"
 
-obj-m := sc_drv.o
+obj-m := sc_dev.o
+sc_dev-objs := sc_drv.o fop.o log.o
 
 #KVERSION = $(shell uname -r)
 all:
