@@ -47,37 +47,100 @@ static int check_values(driver_data_t *data, loff_t *offp)
   return 0;
 }
 
-/**
- * Sends a command to the FPGA
- *
- * TODO: refactor, two functions?
- */
-static int spi_send_command(spi_device_t *spi_device, char command, char address, char value, char *result)
+static int spi_send_read_command(spi_device_t *spi_device,
+				 char memory,
+				 char address,
+				 char *result)
 {
-  size_t res = spi_w8r8(spi_device, command | (address & SPI_ADDRESS_MASK));
+  LOG_ENTRY(); 
 
-  if(res < 0) {
-    LOG_ERROR("spi_w8r8 failed to send command");
-    return -1;
-  }
-  else if(res != SPI_TRANSFER_CODE_OK) {
-    LOG_ERROR("FPGA did not respond with %x when sending command, got %x", SPI_TRANSFER_CODE_OK, res);
-    return -1;
-  }
-  res = spi_w8r8(spi_device, value);
+  int msg_len = 2;
 
+  // Why DMA?
+  u8 *tx_buff = kmalloc(sizeof(u8)*msg_len, GFP_KERNEL | GFP_DMA);
+  tx_buff[0] = SPI_READ | memory | address;
+  tx_buff[1] = SPI_TRANSFER_WAIT_FOR_READ;
+
+  u8 *rx_buff = kmalloc(sizeof(u8)*msg_len, GFP_KERNEL | GFP_DMA);
+  memset(rx_buff, 0, msg_len);
+ 
+  struct spi_transfer transfer;
+  transfer.tx_buf = tx_buff;
+  transfer.rx_buf = rx_buff;
+  transfer.len = msg_len;
+ 
+  struct spi_message msg;
+  spi_message_init(&msg);
+  spi_message_add_tail(&transfer, &msg);
+ 
+  /* this will put us to sleep until the transfers are complete */
+  int res = spi_sync(spi_device, &msg);
   if(res < 0) {
-    LOG_ERROR("spi_w8r8 failed to send value");
+    LOG_ERROR("spi_sync failed to send command: %d", res);
+    LOG_EXIT();
     return -1;
   }
-  else if(res != SPI_TRANSFER_CODE_OK) {
-    LOG_ERROR("FPGA did not respond with %x when sending address, got %x", SPI_TRANSFER_CODE_OK, res);
+  else if(rx_buff[0] != SPI_TRANSFER_CODE_OK) {
+    LOG_ERROR("FPGA did not respond with %x when sending command, got %x", SPI_TRANSFER_CODE_OK, rx_buff[0]);
+    LOG_EXIT();
     return -1;
   }
-  *result = res;
-  return 0;
+ 
+  LOG_DEBUG("%x %x -> %x %x", tx_buff[0], tx_buff[1], rx_buff[0], rx_buff[1]);
+  kfree(tx_buff);
+  kfree(rx_buff);
+
+  *result = rx_buff[1];
+
+  LOG_EXIT();
+  return res; 
 }
 
+static int spi_send_write_command(spi_device_t *spi_device,
+				  char memory,
+				  char address,
+				  char data)
+{
+  LOG_ENTRY(); 
+
+  int msg_len = 2;
+
+  u8 *tx_buff = kmalloc(sizeof(u8)*msg_len, GFP_KERNEL);
+  tx_buff[0] = SPI_WRITE | memory | address;
+  tx_buff[1] = data;
+
+  u8 *rx_buff = kmalloc(sizeof(u8)*msg_len, GFP_KERNEL);
+  memset(rx_buff, 0, msg_len);
+ 
+  struct spi_transfer transfer;
+  transfer.tx_buf = tx_buff;
+  transfer.rx_buf = rx_buff;
+  transfer.len = msg_len;
+ 
+  struct spi_message msg;
+  spi_message_init(&msg);
+  spi_message_add_tail(&transfer, &msg);
+ 
+  /* this will put us to sleep until the transfers are complete */
+  int res = spi_sync(spi_device, &msg);
+  if (res < 0) {
+    LOG_ERROR("spi_sync failed to send command: %d", res);
+    LOG_EXIT();
+    return -1;
+  }
+  else if (rx_buff[0] != SPI_TRANSFER_CODE_OK || rx_buff[1] != SPI_TRANSFER_CODE_OK) {
+    LOG_ERROR("FPGA did not respond with %x when sending command, got %x %x", SPI_TRANSFER_CODE_OK, rx_buff[0], rx_buff[1]);
+    LOG_EXIT();
+    return -1;
+  }
+ 
+  LOG_DEBUG("%x %x -> %x %x", tx_buff[0], tx_buff[1], rx_buff[0], rx_buff[1]);
+  kfree(tx_buff);
+  kfree(rx_buff);
+
+  LOG_EXIT();
+  return res; 
+}
 
 /**
  * Writes one byte at a time at the addres specified by offp
@@ -100,7 +163,6 @@ ssize_t fop_slotcar_write(struct file *filp, const char *buff, size_t len, loff_
   ssize_t send_len = min(len, (size_t)1);
 
   char data_to_write;
-  char result;
 
   if (copy_from_user(&data_to_write, buff, send_len)) {
     LOG_ERROR("Copy from user failed");
@@ -109,7 +171,7 @@ ssize_t fop_slotcar_write(struct file *filp, const char *buff, size_t len, loff_
   }
 
   LOG_DEBUG("Writing: %c on memory address %lld", data_to_write, *offp);
-  if(spi_send_command(data->spi_device, SPI_WRITE | SPI_INTERNAL, *offp, data_to_write, &result) < 0) {
+  if(spi_send_write_command(data->spi_device, SPI_INTERNAL, *offp, data_to_write) < 0) {
     LOG_ERROR("Failed to send command");
     LOG_EXIT();
     return len;
@@ -144,7 +206,7 @@ ssize_t fop_slotcar_read(struct file *filp, char __user *buff, size_t count, lof
   ssize_t read_len = min(count, (size_t)1);
 
   char data_read;
-  if(spi_send_command(data->spi_device, SPI_READ | SPI_INTERNAL, *offp, SPI_TRANSFER_WAIT_FOR_READ, &data_read) < 0) {
+  if(spi_send_read_command(data->spi_device, SPI_INTERNAL, *offp, &data_read) < 0) {
     LOG_ERROR("Failed to read data");
     LOG_EXIT();
     return 0;
