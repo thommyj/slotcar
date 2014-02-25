@@ -77,7 +77,7 @@ architecture syn of spi_decoder is
    --
    -- Define all local signals (like static data) here
    --
-	type state_type is (SPISTATE_IDLE,SPISTATE_WRITE,SPISTATE_READ_WAITFORDONE,SPISTATE_READ_WAITFORDATA);
+	type state_type is (SPISTATE_IDLE,SPISTATE_WRITE,SPISTATE_READ_WAITFORDONE,SPISTATE_READ_WAITFORDATA,SPISTATE_WRITE2,SPISTATE_WRITE3);
 	type out_content_type is (SPIOUT_OK, SPIOUT_ERROR, SPIOUT_INTERNAL, SPIOUT_EXTERNAL);
 	
 	signal state : state_type;
@@ -166,12 +166,18 @@ begin
 				end if;
 			end if;
 					 
-		----------WRITE--------------	 
+		----------WRITE--------------	
 		when SPISTATE_WRITE =>
 			--if peer writes data
 			if (spidata_valid_in = '1') then
+				state <= SPISTATE_WRITE2;
+				out_content <= SPIOUT_OK;	
+			end if;
+		when SPISTATE_WRITE2 =>
+			--if peer writes data
+			if (spidata_valid_in = '1') then
 				rec_data <= spidata_in;
-				state <= SPISTATE_IDLE;
+				state <= SPISTATE_WRITE3;
 				out_content <= SPIOUT_OK;
 				
 				--internal
@@ -189,6 +195,13 @@ begin
 					extreg_addressout	<= "00" & rec_cmd(5 downto 0);
 					extreg_enable		<= '1';
 				end if;
+			end if;
+			----------WRITE--------------	
+		when SPISTATE_WRITE3 =>
+			--if peer writes data
+			if (spidata_valid_in = '1') then
+				state <= SPISTATE_IDLE;
+				out_content <= SPIOUT_OK;	
 			end if;
 					 
 		----------READ--------------	 
@@ -233,7 +246,9 @@ end process;
 		led_states <= x"01" when SPISTATE_IDLE,
 				    x"02" when SPISTATE_WRITE,
 					 x"04" when SPISTATE_READ_WAITFORDONE,
-					 x"08" when SPISTATE_READ_WAITFORDATA;
+					 x"08" when SPISTATE_READ_WAITFORDATA,
+					 x"10" when SPISTATE_WRITE2,
+					 x"12" when SPISTATE_WRITE3;
 end architecture syn;
 
 -- *** EOF ***
