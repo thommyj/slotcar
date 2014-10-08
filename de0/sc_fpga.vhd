@@ -58,10 +58,13 @@ entity sc_fpga is
 			MOSI_async    : in  std_logic;
 			MISO_async    : out std_logic;
 			SS_out        : out std_logic;
-			SCLK_out      : out std_logic;
+			SCLK_out      : buffer std_logic;
 			MOSI_out      : out std_logic;
 			MISO_out      : out std_logic;
-			UART_out	     : out std_logic
+			UART_out	     : out std_logic;
+			UART_out_rts  : out std_logic;
+			UART_in	     : in std_logic;
+			UART_in_rts   : out std_logic
        );
 end entity sc_fpga;
 
@@ -138,6 +141,17 @@ architecture syn of sc_fpga is
 			uart_data_out				 : out std_logic
        );
 	end component;
+	
+	component rxuart is
+   port( 
+         clk                      : in   std_logic;
+			rst                      : in   std_logic;
+			parallell_data_out       : out  std_logic_vector(7 downto 0);
+			parallell_data_out_valid : out  std_logic;
+			uart_data_in_ext			 : in   std_logic;
+			debug_data_valid			 : out  std_logic
+       );
+	end component;
 		 
 	 signal clk                       	: std_logic;
 	 signal rst                       	: std_logic;
@@ -152,6 +166,8 @@ architecture syn of sc_fpga is
 	 signal rs485data_enable				: std_logic;
 	 signal rs485data_to_spi				: std_logic_vector(7 downto 0);
 	 signal rs485address_to_spi			: std_logic_vector(7 downto 0);
+	 signal leds								: std_logic_vector(7 downto 0);
+	 signal data_valid_to_uart				: std_logic;
 
 begin
 
@@ -184,7 +200,7 @@ begin
 						spidata_valid_in 	=> spidata_valid_from_master,
 						pll_locked 			=> pll_locked,
 						version 				=> VERSION,
-						leds 					=> LED_GREEN,
+						leds 					=> open, --LED_GREEN,
 						extreg_dataout		=> rs485data_from_powerbase, --should later come from rs485 block
 						extreg_addressout	=> rs485address_from_powerbase, --should later come from rs485 block
 						extreg_enable		=> rs485data_enable,
@@ -206,10 +222,20 @@ begin
 		port map( 
 						clk                      => clk,
 						rst                      => rst,
-						parallell_data_in        => "10100001",
-						parallell_data_in_valid  => '1',
+						parallell_data_in        => "10100101",
+						parallell_data_in_valid  => data_valid_to_uart,
 						parallell_data_in_sent   => open,
 						uart_data_out				 => UART_out
+       );
+		 
+	inst_rxuart : rxuart
+		port map(
+						clk                      => clk,
+						rst                      => rst,
+						parallell_data_out       => leds,
+						parallell_data_out_valid => SCLK_out,
+						uart_data_in_ext			 => UART_in,
+						debug_data_valid			 => SS_out
        );
 
 		 
@@ -227,10 +253,42 @@ begin
 	end if;
 end process;	
 					     
-	SS_out   <= '0';
-	SCLK_out <= '0';
-	MOSI_out <= '0';
+process(clk,rst)
+begin
+	if(rst = '1')	then
+		LED_GREEN <= "10000010";
+	elsif(clk'event and clk = '1') then
+		if(SCLK_out = '1') then
+			LED_GREEN <= leds;
+		end if;
+	end if;
+end process;	
+
+
+process(clk,rst)
+	variable delay_cnt : integer := 0;
+begin
+	if(rst = '1')	then
+		delay_cnt := 0;
+		data_valid_to_uart <= '0';
+	elsif(clk'event and clk = '1') then
+		delay_cnt := delay_cnt + 1;
+		
+		if delay_cnt = 30000 then
+			data_valid_to_uart <= '1';
+			delay_cnt := 0;
+		else
+			data_valid_to_uart <= '0';
+		end if;
+	end if;
+end process;	
+
+	--SS_out   <= '0';
+	--SCLK_out <= '0';
+	MOSI_out <= data_valid_to_uart;
 	MISO_out <= '0';
+	UART_out_rts <= '1';
+	UART_in_rts <= '0';
    
 end architecture syn;
 

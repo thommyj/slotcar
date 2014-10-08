@@ -47,103 +47,128 @@ use ieee.std_logic_arith.all;
 --*  DEFINE: Entity                                                           *
 --*****************************************************************************
 
-entity txuart is
+entity rxuart is
    port( 
-         clk                      : in  std_logic;
-			rst                      : in  std_logic;
-			parallell_data_in        : in  std_logic_vector(7 downto 0);
-			parallell_data_in_valid  : in  std_logic;
-			parallell_data_in_sent   : out std_logic;
-			uart_data_out				 : out std_logic
+         clk                      : in   std_logic;
+			rst                      : in   std_logic;
+			parallell_data_out       : buffer  std_logic_vector(7 downto 0);
+			parallell_data_out_valid : out  std_logic;
+			uart_data_in_ext			 : in   std_logic;
+			debug_data_valid			 : out  std_logic
        );
-end entity txuart;
+end entity rxuart;
 
 --*****************************************************************************
 --*  DEFINE: Architecture                                                     *
 --****************************************************************************
 
-architecture syn of txuart is
+architecture syn of rxuart is
 
-	type sendstate_type is (TXSTATE_IDLE, TXSTATE_START, TXSTATE_DATA, TXSTATE_STOP);
+	type clkstate_type is (BAUDRATE_CLK_ON, BAUDRATE_CLK_OFF);
    signal uart_clk_re  : std_logic;
-	signal send_state : sendstate_type;
-	signal send_data : std_logic_vector(7 downto 0);
-
-
+	signal clkstate : clkstate_type;
+	signal start_baudrate_clk : std_logic;
+	
+	signal uart_data_in_meta : std_logic_vector(1 downto 0);
+	signal uart_data_in : std_logic;
+	
 	
 begin
 
 	--
-	--produce clk at the baudrate
+	--produce baudrate clk
 	--
 	process(clk,rst)
 		variable uart_clk_cnt : integer := 0;
+		variable uart_bit_cnt : integer := 0;
    begin
 		if rst = '1' then
 			uart_clk_re <= '0';
+			clkstate <= BAUDRATE_CLK_OFF;
 			uart_clk_cnt := 0;
+			uart_bit_cnt := 0;
 		elsif rising_edge(clk) then
-			--50M/(19200)=2604.16
-			--TODO: fix average frequency
-			if(uart_clk_cnt = 2604) then
-				uart_clk_re <= '1';
-				uart_clk_cnt := 0;
-			else
-				uart_clk_re <= '0';
-				uart_clk_cnt := uart_clk_cnt + 1;
-			end if;
+			parallell_data_out_valid <= '0';
+			case clkstate is
+				when BAUDRATE_CLK_OFF =>
+					if start_baudrate_clk = '1' then
+						clkstate <= BAUDRATE_CLK_ON;
+					end if;
+					uart_clk_cnt := 0;
+					uart_bit_cnt := 0;
+					uart_clk_re <= '0';
+
+				when BAUDRATE_CLK_ON =>
+					--50M/(19200)=2604.16
+					--TODO: fix average frequency
+					if(uart_clk_cnt = 2604) then
+						if uart_bit_cnt /= 8 then
+							uart_clk_re <= '1';
+						end if;
+						uart_bit_cnt := uart_bit_cnt + 1;
+						uart_clk_cnt := 0;
+					else
+						uart_clk_re <= '0';
+						uart_clk_cnt := uart_clk_cnt + 1;
+					end if;
+					
+					if uart_bit_cnt = 9 then
+						clkstate <= BAUDRATE_CLK_OFF;
+						parallell_data_out_valid <= '1';
+					end if;
+			end case;
 		end if;
 	end process;
 	
-
+	debug_data_valid <= uart_clk_re;
 	
 	--
-	-- when data_in_valid goes high, start sending out data
+	-- metastability
 	--
-	process(clk,rst)
-		variable send_cnt  : integer := 0;
+	process (clk,rst)
 	begin
 		if rst = '1' then
-				send_state <= TXSTATE_IDLE;
-				send_cnt  := 0;
-				uart_data_out <= '1';
-				parallell_data_in_sent <= '0';
+			uart_data_in_meta <= "11";
 		elsif rising_edge(clk) then
-			--if uart_clk_re = '1' then
-				case send_state is
-					when TXSTATE_IDLE =>
-						send_cnt  := 0;
-						uart_data_out <= '1'; --high during idle
-						parallell_data_in_sent <= '0';
-						
-						if(parallell_data_in_valid = '1') then
-							send_state <= TXSTATE_START;
-							send_data <= parallell_data_in;
-						end if;
-					
-					when TXSTATE_START =>
-					if uart_clk_re = '1' then
-						uart_data_out <= '0'; --start bit low
-						send_state <= TXSTATE_DATA;
-					end if;
-						
-					when TXSTATE_DATA =>
-					if uart_clk_re = '1' then
-						uart_data_out <= send_data(send_cnt);
-						send_cnt := send_cnt + 1;
-						if(send_cnt > 7) then
-							send_state <= TXSTATE_STOP;
-						end if;
-					end if;
-						
-					when TXSTATE_STOP =>
-					if uart_clk_re = '1' then
-						uart_data_out <= '1';  --stop bit high
-						parallell_data_in_sent <= '1'; --transmit done
-						send_state <= TXSTATE_IDLE;
-					end if;
-				end case;
-			--end if;	
+			uart_data_in_meta <= uart_data_in_meta(0) & uart_data_in_ext;
+		end if;
+	end process;
+	uart_data_in <= uart_data_in_meta(1);
+	
+	
+	
+	process (clk,rst)
+		variable zero_cnt : integer := 0;
+	begin
+		if rst = '1' then
+			zero_cnt := 0;
+		elsif rising_edge(clk) then
+			if uart_data_in = '0' then
+				zero_cnt := zero_cnt + 1;
+			else
+				zero_cnt := 0;
+			end if;
+			
+			if zero_cnt = 650 then
+				start_baudrate_clk <= '1';
+			else
+				start_baudrate_clk <= '0';
+			end if;
+		end if;
+	end process;
+		
+	
+	--
+	-- sample uart data
+	--
+	process(clk,rst)
+	begin
+		if rst = '1' then
+			parallell_data_out <= (others => '0');
+		elsif rising_edge(clk) then
+			if uart_clk_re = '1' then
+				parallell_data_out <= parallell_data_out(6 downto 0) & uart_data_in;
+			end if;	
 		end if; 
 	end process;
 	
