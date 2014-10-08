@@ -60,7 +60,8 @@ entity sc_fpga is
 			SS_out        : out std_logic;
 			SCLK_out      : out std_logic;
 			MOSI_out      : out std_logic;
-			MISO_out      : out std_logic
+			MISO_out      : out std_logic;
+			UART_out	     : out std_logic
        );
 end entity sc_fpga;
 
@@ -89,8 +90,8 @@ architecture syn of sc_fpga is
 			SCLK_async     : in  std_logic;
 			MOSI_async     : in  std_logic;
 			MISO_async     : out std_logic;
-			data_out       : buffer std_logic_vector(7 downto 0);
-			data_in        : in  std_logic_vector(7 downto 0);
+			data_out       : buffer std_logic_vector(7 downto 0);		--from rpi
+			data_in        : in  std_logic_vector(7 downto 0);			--to rpi
          data_out_valid : buffer std_logic
        );
 	end component;
@@ -99,8 +100,8 @@ architecture syn of sc_fpga is
 		port( 
          clk               : in  std_logic;
 			rst               : in  std_logic;
-			spidata_out       : out std_logic_vector(7 downto 0);
-			spidata_in        : in  std_logic_vector(7 downto 0);
+			spidata_out       : out std_logic_vector(7 downto 0);    --to rpi
+			spidata_in        : in  std_logic_vector(7 downto 0);		--from rpi
 			spidata_valid_in  : in  std_logic;
 			leds					: out std_logic_vector(7 downto 0);
 			pll_locked        : in  std_logic;
@@ -124,6 +125,17 @@ architecture syn of sc_fpga is
 			
 			reader_data    : out std_logic_vector(7 downto 0);
 			reader_address : in  std_logic_vector(7 downto 0)
+       );
+	end component;
+	
+	component txuart is
+   port( 
+         clk                      : in  std_logic;
+			rst                      : in  std_logic;
+			parallell_data_in        : in  std_logic_vector(7 downto 0);
+			parallell_data_in_valid  : in  std_logic;
+			parallell_data_in_sent   : out std_logic;
+			uart_data_out				 : out std_logic
        );
 	end component;
 		 
@@ -189,6 +201,15 @@ begin
 						writer_enable	=> rs485data_enable,
 						reader_data		=> rs485data_to_spi,
 						reader_address => rs485address_to_spi
+       );
+	inst_txuart : txuart
+		port map( 
+						clk                      => clk,
+						rst                      => rst,
+						parallell_data_in        => "10100001",
+						parallell_data_in_valid  => '1',
+						parallell_data_in_sent   => open,
+						uart_data_out				 => UART_out
        );
 
 		 
