@@ -148,8 +148,7 @@ architecture syn of sc_fpga is
 			rst                      : in   std_logic;
 			parallell_data_out       : out  std_logic_vector(7 downto 0);
 			parallell_data_out_valid : out  std_logic;
-			uart_data_in_ext			 : in   std_logic;
-			debug_data_valid			 : out  std_logic
+			uart_data_in_ext			 : in   std_logic
        );
 	end component;
 		 
@@ -166,7 +165,8 @@ architecture syn of sc_fpga is
 	 signal rs485data_enable				: std_logic;
 	 signal rs485data_to_spi				: std_logic_vector(7 downto 0);
 	 signal rs485address_to_spi			: std_logic_vector(7 downto 0);
-	 signal leds								: std_logic_vector(7 downto 0);
+	 signal leds_from_rx						: std_logic_vector(7 downto 0);
+	 signal leds_to_tx						: std_logic_vector(7 downto 0);
 	 signal data_valid_to_uart				: std_logic;
 
 begin
@@ -222,7 +222,7 @@ begin
 		port map( 
 						clk                      => clk,
 						rst                      => rst,
-						parallell_data_in        => "10100101",
+						parallell_data_in        => leds_to_tx,
 						parallell_data_in_valid  => data_valid_to_uart,
 						parallell_data_in_sent   => open,
 						uart_data_out				 => UART_out
@@ -232,10 +232,9 @@ begin
 		port map(
 						clk                      => clk,
 						rst                      => rst,
-						parallell_data_out       => leds,
+						parallell_data_out       => leds_from_rx,
 						parallell_data_out_valid => SCLK_out,
-						uart_data_in_ext			 => UART_in,
-						debug_data_valid			 => SS_out
+						uart_data_in_ext			 => UART_in
        );
 
 		 
@@ -256,10 +255,10 @@ end process;
 process(clk,rst)
 begin
 	if(rst = '1')	then
-		LED_GREEN <= "10000010";
+		LED_GREEN <= "00000000";
 	elsif(clk'event and clk = '1') then
 		if(SCLK_out = '1') then
-			LED_GREEN <= leds;
+			LED_GREEN <= leds_from_rx;
 		end if;
 	end if;
 end process;	
@@ -271,11 +270,16 @@ begin
 	if(rst = '1')	then
 		delay_cnt := 0;
 		data_valid_to_uart <= '0';
+		leds_to_tx <= "00000001";
 	elsif(clk'event and clk = '1') then
 		delay_cnt := delay_cnt + 1;
 		
-		if delay_cnt = 30000 then
+		if delay_cnt = 2400000 then
+			leds_to_tx <= leds_to_tx(0) & leds_to_tx(7 downto 1);
 			data_valid_to_uart <= '1';
+		elsif (delay_cnt > 2400000) and (delay_cnt < 2402000) then
+			data_valid_to_uart <= '1';
+		elsif (delay_cnt > 2402000) then
 			delay_cnt := 0;
 		else
 			data_valid_to_uart <= '0';

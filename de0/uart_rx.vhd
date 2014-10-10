@@ -53,8 +53,7 @@ entity rxuart is
 			rst                      : in   std_logic;
 			parallell_data_out       : buffer  std_logic_vector(7 downto 0);
 			parallell_data_out_valid : out  std_logic;
-			uart_data_in_ext			 : in   std_logic;
-			debug_data_valid			 : out  std_logic
+			uart_data_in_ext			 : in   std_logic
        );
 end entity rxuart;
 
@@ -76,7 +75,43 @@ architecture syn of rxuart is
 begin
 
 	--
-	--produce baudrate clk
+	-- metastability
+	--
+	process (clk,rst)
+	begin
+		if rst = '1' then
+			uart_data_in_meta <= "11";
+		elsif rising_edge(clk) then
+			uart_data_in_meta <= uart_data_in_meta(0) & uart_data_in_ext;
+		end if;
+	end process;
+	uart_data_in <= uart_data_in_meta(1);
+	
+	--
+	--sync in to middle of startbit
+	--
+	process (clk,rst)
+		variable zero_cnt : integer := 0;
+	begin
+		if rst = '1' then
+			zero_cnt := 0;
+		elsif rising_edge(clk) then
+			if uart_data_in = '0' then
+				zero_cnt := zero_cnt + 1;
+			else
+				zero_cnt := 0;
+			end if;
+			
+			if zero_cnt = 1302 then
+				start_baudrate_clk <= '1';
+			else
+				start_baudrate_clk <= '0';
+			end if;
+		end if;
+	end process;	
+
+	--
+	--produce a pulse in middle of each bit
 	--
 	process(clk,rst)
 		variable uart_clk_cnt : integer := 0;
@@ -119,44 +154,6 @@ begin
 			end case;
 		end if;
 	end process;
-	
-	debug_data_valid <= uart_clk_re;
-	
-	--
-	-- metastability
-	--
-	process (clk,rst)
-	begin
-		if rst = '1' then
-			uart_data_in_meta <= "11";
-		elsif rising_edge(clk) then
-			uart_data_in_meta <= uart_data_in_meta(0) & uart_data_in_ext;
-		end if;
-	end process;
-	uart_data_in <= uart_data_in_meta(1);
-	
-	
-	
-	process (clk,rst)
-		variable zero_cnt : integer := 0;
-	begin
-		if rst = '1' then
-			zero_cnt := 0;
-		elsif rising_edge(clk) then
-			if uart_data_in = '0' then
-				zero_cnt := zero_cnt + 1;
-			else
-				zero_cnt := 0;
-			end if;
-			
-			if zero_cnt = 650 then
-				start_baudrate_clk <= '1';
-			else
-				start_baudrate_clk <= '0';
-			end if;
-		end if;
-	end process;
-		
 	
 	--
 	-- sample uart data

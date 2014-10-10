@@ -47,7 +47,31 @@ use ieee.std_logic_arith.all;
 --*  DEFINE: Entity                                                           *
 --*****************************************************************************
 
-entity txuart is
+entity uart_halfduplex is
+   port( 
+         clk                      : in   std_logic;
+			rst                      : in   std_logic;
+			parallell_data_out       : out  std_logic_vector(7 downto 0);
+			parallell_data_out_valid : out  std_logic;
+			uart_data_in				 : in   std_logic;
+			
+			parallell_data_in        : in  std_logic_vector(7 downto 0);
+			parallell_data_in_valid  : in  std_logic;
+			parallell_data_in_sent   : out std_logic;
+			uart_data_out				 : out std_logic;
+			
+			rts							 : out std_logic
+       );
+end entity uart_halfduplex;
+
+--*****************************************************************************
+--*  DEFINE: Architecture                                                     *
+--****************************************************************************
+
+architecture syn of uart_halfduplex is
+
+
+	component txuart is
    port( 
          clk                      : in  std_logic;
 			rst                      : in  std_logic;
@@ -57,92 +81,40 @@ entity txuart is
 			uart_data_out				 : out std_logic;
 			busy							 : out std_logic
        );
-end entity txuart;
-
---*****************************************************************************
---*  DEFINE: Architecture                                                     *
---****************************************************************************
-
-architecture syn of txuart is
-
-	type sendstate_type is (TXSTATE_IDLE, TXSTATE_START, TXSTATE_DATA, TXSTATE_STOP);
-   signal uart_clk_re  : std_logic;
-	signal send_state : sendstate_type;
-	signal send_data : std_logic_vector(7 downto 0);
-
-
+	end component;
+	
+	component rxuart is
+   port( 
+         clk                      : in   std_logic;
+			rst                      : in   std_logic;
+			parallell_data_out       : out  std_logic_vector(7 downto 0);
+			parallell_data_out_valid : out  std_logic;
+			uart_data_in_ext			 : in   std_logic
+       );
+	end component;
 	
 begin
 
-	--
-	--produce clk at the baudrate
-	--
-	process(clk,rst)
-		variable uart_clk_cnt : integer := 0;
-   begin
-		if rst = '1' then
-			uart_clk_re <= '0';
-			uart_clk_cnt := 0;
-		elsif rising_edge(clk) then
-			--50M/(19200)=2604.16
-			--TODO: fix average frequency
-			if send_state = TXSTATE_IDLE or uart_clk_cnt = 2604 then
-				uart_clk_re <= '1';
-				uart_clk_cnt := 0;
-			else
-				uart_clk_re <= '0';
-				uart_clk_cnt := uart_clk_cnt + 1;
-			end if;
-		end if;
-	end process;
-	
-	--
-	-- when data_in_valid goes high, start sending out data
-	--
-	process(clk,rst)
-		variable send_cnt  : integer := 0;
-	begin
-		if rst = '1' then
-				send_state <= TXSTATE_IDLE;
-				send_cnt  := 0;
-				uart_data_out <= '1';
-				parallell_data_in_sent <= '0';
-				busy <= '0';
-		elsif rising_edge(clk) then
-			if uart_clk_re = '1' then
-				case send_state is
-					when TXSTATE_IDLE =>
-						send_cnt  := 0;
-						uart_data_out <= '1'; --high during idle
-						parallell_data_in_sent <= '0';
-						busy <= '0';
-						
-						if(parallell_data_in_valid = '1') then
-							send_state <= TXSTATE_START;
-							busy <= '1';
-							send_data <= parallell_data_in;
-						end if;
-					
-					when TXSTATE_START =>
-						uart_data_out <= '0'; --start bit low
-						send_state <= TXSTATE_DATA;
-						
-					when TXSTATE_DATA =>
-						uart_data_out <= send_data(send_cnt);
-						send_cnt := send_cnt + 1;
-						if(send_cnt > 7) then
-							send_state <= TXSTATE_STOP;
-						end if;
-						
-					when TXSTATE_STOP =>
-						uart_data_out <= '1';  --stop bit high
-						parallell_data_in_sent <= '1'; --transmit done
-						send_state <= TXSTATE_IDLE;
-				end case;
-			end if;	
-		end if; 
-	end process;
-	
+	inst_txuart : txuart
+		port map( 
+						clk                      => clk,
+						rst                      => rst,
+						parallell_data_in        => parallell_data_in,
+						parallell_data_in_valid  => parallell_data_in_valid,
+						parallell_data_in_sent   => parallell_data_in_sent,
+						uart_data_out				 => uart_data_out,
+						busy							 => rts
+       );
+		 
+	inst_rxuart : rxuart
+		port map(
+						clk                      => clk,
+						rst                      => rst,
+						parallell_data_out       => parallell_data_out,
+						parallell_data_out_valid => parallell_data_out_valid,
+						uart_data_in_ext			 => uart_data_in
+       );
+
 	
 end architecture syn;
 
