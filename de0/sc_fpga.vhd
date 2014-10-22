@@ -61,10 +61,12 @@ entity sc_fpga is
 			SCLK_out      : buffer std_logic;
 			MOSI_out      : out std_logic;
 			MISO_out      : out std_logic;
-			UART_out	     : out std_logic;
-			UART_out_rts  : out std_logic;
-			UART_in	     : in std_logic;
-			UART_in_rts   : out std_logic
+			UART0_out	  : out std_logic;
+			UART0_in	     : in std_logic;
+--			UART0_rts     : out std_logic;
+			UART1_out	  : out std_logic;
+			UART1_in	     : in std_logic
+--			UART1_rts     : out std_logic
        );
 end entity sc_fpga;
 
@@ -74,6 +76,8 @@ end entity sc_fpga;
 
 architecture syn of sc_fpga is
 
+	type uartstate_type is (IDLE0,UART0TX,UART1RX,IDLE1,UART1TX,UART0RX);
+	signal uartstate : uartstate_type;
    --
    -- Define all components which are included here
    --
@@ -131,26 +135,23 @@ architecture syn of sc_fpga is
        );
 	end component;
 	
-	component txuart is
+	component uart_halfduplex is
    port( 
-         clk                      : in  std_logic;
-			rst                      : in  std_logic;
-			parallell_data_in        : in  std_logic_vector(7 downto 0);
-			parallell_data_in_valid  : in  std_logic;
-			parallell_data_in_sent   : out std_logic;
-			uart_data_out				 : out std_logic
-       );
-	end component;
-	
-	component rxuart is
-   port( 
-         clk                      : in   std_logic;
+			clk                      : in   std_logic;
 			rst                      : in   std_logic;
 			parallell_data_out       : out  std_logic_vector(7 downto 0);
 			parallell_data_out_valid : out  std_logic;
-			uart_data_in_ext			 : in   std_logic
+			uart_data_in				 : in   std_logic;
+			
+			parallell_data_in        : in  std_logic_vector(7 downto 0);
+			parallell_data_in_valid  : in  std_logic;
+			parallell_data_in_sent   : out std_logic;
+			uart_data_out				 : out std_logic;
+			
+			rts							 : out std_logic
        );
 	end component;
+	
 		 
 	 signal clk                       	: std_logic;
 	 signal rst                       	: std_logic;
@@ -165,9 +166,23 @@ architecture syn of sc_fpga is
 	 signal rs485data_enable				: std_logic;
 	 signal rs485data_to_spi				: std_logic_vector(7 downto 0);
 	 signal rs485address_to_spi			: std_logic_vector(7 downto 0);
-	 signal leds_from_rx						: std_logic_vector(7 downto 0);
-	 signal leds_to_tx						: std_logic_vector(7 downto 0);
-	 signal data_valid_to_uart				: std_logic;
+	 
+	 --UART
+	 signal UART0_parallell_data_out			: std_logic_vector(7 downto 0);
+	 signal UART0_parallell_data_out_valid : std_logic;
+	 signal UART0_parallell_data_in			: std_logic_vector(7 downto 0);
+	 signal UART0_parallell_data_in_valid	: std_logic;
+	 signal UART0_parallell_data_in_sent	: std_logic;
+						
+	 signal UART1_parallell_data_out			: std_logic_vector(7 downto 0);
+	 signal UART1_parallell_data_out_valid : std_logic;
+	 signal UART1_parallell_data_in			: std_logic_vector(7 downto 0);
+	 signal UART1_parallell_data_in_valid	: std_logic;
+	 signal UART1_parallell_data_in_sent	: std_logic;
+	 
+	 signal UART_payload							: std_logic_vector(7 downto 0);
+	
+	
 
 begin
 
@@ -218,24 +233,34 @@ begin
 						reader_data		=> rs485data_to_spi,
 						reader_address => rs485address_to_spi
        );
-	inst_txuart : txuart
+	inst_UART0 : uart_halfduplex
 		port map( 
 						clk                      => clk,
 						rst                      => rst,
-						parallell_data_in        => leds_to_tx,
-						parallell_data_in_valid  => data_valid_to_uart,
-						parallell_data_in_sent   => open,
-						uart_data_out				 => UART_out
+						parallell_data_out       => UART0_parallell_data_out,
+						parallell_data_out_valid => UART0_parallell_data_out_valid,
+						uart_data_in				 => UART0_in,
+						parallell_data_in        => UART0_parallell_data_in,
+						parallell_data_in_valid  => UART0_parallell_data_in_valid,
+						parallell_data_in_sent   => UART0_parallell_data_in_sent,
+						uart_data_out				 => UART0_out,
+						rts							 => open
        );
 		 
-	inst_rxuart : rxuart
-		port map(
+	inst_UART1 : uart_halfduplex
+		port map( 
 						clk                      => clk,
 						rst                      => rst,
-						parallell_data_out       => leds_from_rx,
-						parallell_data_out_valid => SCLK_out,
-						uart_data_in_ext			 => UART_in
+						parallell_data_out       => UART1_parallell_data_out,
+						parallell_data_out_valid => UART1_parallell_data_out_valid,
+						uart_data_in				 => UART1_in,
+						parallell_data_in        => UART1_parallell_data_in,
+						parallell_data_in_valid  => UART1_parallell_data_in_valid,
+						parallell_data_in_sent   => UART1_parallell_data_in_sent,
+						uart_data_out				 => UART1_out,
+						rts							 => open
        );
+	
 
 		 
 --async trigg of reset, sync release
@@ -251,48 +276,65 @@ begin
 		end if;
 	end if;
 end process;	
-					     
+
+ 
 process(clk,rst)
+variable uartdelay_cnt : integer := 0;
 begin
 	if(rst = '1')	then
-		LED_GREEN <= "00000000";
+		LED_GREEN <= "11111111";
+		UART_payload <= "10000000";
+		uartstate <= IDLE0;
+		UART0_parallell_data_in_valid <= '0';
+		UART1_parallell_data_in_valid <= '0';
+		uartdelay_cnt := 0;
 	elsif(clk'event and clk = '1') then
-		if(SCLK_out = '1') then
-			LED_GREEN <= leds_from_rx;
-		end if;
-	end if;
-end process;	
-
-
-process(clk,rst)
-	variable delay_cnt : integer := 0;
-begin
-	if(rst = '1')	then
-		delay_cnt := 0;
-		data_valid_to_uart <= '0';
-		leds_to_tx <= "00000001";
-	elsif(clk'event and clk = '1') then
-		delay_cnt := delay_cnt + 1;
+		UART0_parallell_data_in <= (others => '0');
+		UART1_parallell_data_in <= (others => '0');
 		
-		if delay_cnt = 2400000 then
-			leds_to_tx <= leds_to_tx(0) & leds_to_tx(7 downto 1);
-			data_valid_to_uart <= '1';
-		elsif (delay_cnt > 2400000) and (delay_cnt < 2402000) then
-			data_valid_to_uart <= '1';
-		elsif (delay_cnt > 2402000) then
-			delay_cnt := 0;
-		else
-			data_valid_to_uart <= '0';
-		end if;
+		case uartstate is
+			when IDLE0 =>
+				uartdelay_cnt := uartdelay_cnt + 1;
+				if uartdelay_cnt = 1000000 then
+					uartdelay_cnt := 0;
+					uartstate <= UART0TX;
+				end if;
+			when UART0TX =>
+				UART_payload <= UART_payload(0) & UART_payload(7 downto 1);
+				UART0_parallell_data_in <= UART_payload(0) & UART_payload(7 downto 1);
+				UART0_parallell_data_in_valid <= '1';
+				uartstate <= UART1RX;
+			when UART1RX =>
+				UART0_parallell_data_in_valid <= '0';
+				if UART1_parallell_data_out_valid = '1' then
+					LED_GREEN <= UART1_parallell_data_out;
+					uartstate <= IDLE1;
+				end if;
+			when IDLE1 =>
+				uartdelay_cnt := uartdelay_cnt + 1;
+				if uartdelay_cnt = 1000000 then
+					uartdelay_cnt := 0;
+					uartstate <= UART1TX;
+				end if;
+			when UART1TX =>
+				UART_payload <= UART_payload(0) & UART_payload(7 downto 1);
+				UART1_parallell_data_in <= UART_payload(0) & UART_payload(7 downto 1);
+				UART1_parallell_data_in_valid <= '1';
+				uartstate <= UART0RX;
+			when UART0RX =>
+				UART1_parallell_data_in_valid <= '0';
+				if UART0_parallell_data_out_valid = '1' then
+					LED_GREEN <= UART0_parallell_data_out;
+					uartstate <= IDLE0;
+				end if;
+		end case;	
 	end if;
 end process;	
 
 	--SS_out   <= '0';
 	--SCLK_out <= '0';
-	MOSI_out <= data_valid_to_uart;
+	MOSI_out <= '0';
 	MISO_out <= '0';
-	UART_out_rts <= '1';
-	UART_in_rts <= '0';
    
 end architecture syn;
 

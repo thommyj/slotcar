@@ -115,7 +115,6 @@ begin
 						uart_data_in_ext			 => uart_data_in
        );
 
-	
 end architecture syn;
 
 -- *** EOF ***
