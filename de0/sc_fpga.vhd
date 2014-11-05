@@ -152,6 +152,17 @@ architecture syn of sc_fpga is
        );
 	end component;
 	
+	component uart_controller
+   port ( 
+	      clk                      : in   std_logic;
+	  		rst                      : in   std_logic;
+			rts_screen               : out  std_logic;
+			datarec_screen           : in   std_logic;
+			rts_track                : out  std_logic;
+			datarec_track            : in   std_logic
+        );
+   end component uart_controller;
+	
 		 
 	 signal clk                       	: std_logic;
 	 signal rst                       	: std_logic;
@@ -260,7 +271,15 @@ begin
 						uart_data_out				 => UART1_out,
 						rts							 => open
        );
-	
+	inst_UART_CONTROLLER : uart_controller
+	   port map(
+		            clk                      => clk,
+	  		         rst                      => rst,
+			         rts_screen               => UART1_parallell_data_in_valid,
+			         datarec_screen           => UART1_parallell_data_out_valid,
+			         rts_track                => UART0_parallell_data_in_valid,
+			         datarec_track            => UART0_parallell_data_out_valid
+       );
 
 		 
 --async trigg of reset, sync release
@@ -277,64 +296,16 @@ begin
 	end if;
 end process;	
 
+ UART1_parallell_data_in <= UART0_parallell_data_out;
+ UART0_parallell_data_in <= UART1_parallell_data_out;
  
-process(clk,rst)
-variable uartdelay_cnt : integer := 0;
-begin
-	if(rst = '1')	then
-		LED_GREEN <= "11111111";
-		UART_payload <= "10000000";
-		uartstate <= IDLE0;
-		UART0_parallell_data_in_valid <= '0';
-		UART1_parallell_data_in_valid <= '0';
-		uartdelay_cnt := 0;
-	elsif(clk'event and clk = '1') then
-		UART0_parallell_data_in <= (others => '0');
-		UART1_parallell_data_in <= (others => '0');
-		
-		case uartstate is
-			when IDLE0 =>
-				uartdelay_cnt := uartdelay_cnt + 1;
-				if uartdelay_cnt = 1000000 then
-					uartdelay_cnt := 0;
-					uartstate <= UART0TX;
-				end if;
-			when UART0TX =>
-				UART_payload <= UART_payload(0) & UART_payload(7 downto 1);
-				UART0_parallell_data_in <= UART_payload(0) & UART_payload(7 downto 1);
-				UART0_parallell_data_in_valid <= '1';
-				uartstate <= UART1RX;
-			when UART1RX =>
-				UART0_parallell_data_in_valid <= '0';
-				if UART1_parallell_data_out_valid = '1' then
-					LED_GREEN <= UART1_parallell_data_out;
-					uartstate <= IDLE1;
-				end if;
-			when IDLE1 =>
-				uartdelay_cnt := uartdelay_cnt + 1;
-				if uartdelay_cnt = 1000000 then
-					uartdelay_cnt := 0;
-					uartstate <= UART1TX;
-				end if;
-			when UART1TX =>
-				UART_payload <= UART_payload(0) & UART_payload(7 downto 1);
-				UART1_parallell_data_in <= UART_payload(0) & UART_payload(7 downto 1);
-				UART1_parallell_data_in_valid <= '1';
-				uartstate <= UART0RX;
-			when UART0RX =>
-				UART1_parallell_data_in_valid <= '0';
-				if UART0_parallell_data_out_valid = '1' then
-					LED_GREEN <= UART0_parallell_data_out;
-					uartstate <= IDLE0;
-				end if;
-		end case;	
-	end if;
-end process;	
-
 	--SS_out   <= '0';
 	--SCLK_out <= '0';
 	MOSI_out <= '0';
 	MISO_out <= '0';
+	
+	
+	LED_GREEN <= UART1_parallell_data_in;
    
 end architecture syn;
 

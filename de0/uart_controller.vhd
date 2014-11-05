@@ -47,113 +47,28 @@ use ieee.std_logic_arith.all;
 --*  DEFINE: Entity                                                           *
 --*****************************************************************************
 
-entity rxuart is
+entity uart_controller is
    port( 
          clk                      : in   std_logic;
 			rst                      : in   std_logic;
-			parallell_data_out       : buffer  std_logic_vector(7 downto 0);
-			parallell_data_out_valid : out  std_logic;
-			uart_data_in_ext			 : in   std_logic
-       );
-end entity rxuart;
+			rts_screen               : out  std_logic;
+			datarec_screen           : in   std_logic;
+			rts_track                : out  std_logic;
+			datarec_track            : in   std_logic
+			);
+end entity uart_controller;
 
 --*****************************************************************************
 --*  DEFINE: Architecture                                                     *
 --****************************************************************************
 
-architecture syn of rxuart is
+architecture syn of uart_controller is
 
-	type clkstate_type is (BAUDRATE_CLK_ON, BAUDRATE_CLK_OFF);
-   signal uart_clk_re  : std_logic;
-	signal clkstate : clkstate_type;
-	signal start_baudrate_clk : std_logic;
-	
-	signal uart_data_in_meta : std_logic_vector(1 downto 0);
-	signal uart_data_in : std_logic;
-	
+	type uartstate_type is (IDLE, STORE_FROM_SCREEN, STORE_FROM_TRACK, SEND_TO_SCREEN, SEND_TO_TRACK);
+	signal uartstate : uartstate_type;
 	
 begin
 
-	--
-	-- metastability
-	--
-	process (clk,rst)
-	begin
-		if rst = '1' then
-			uart_data_in_meta <= "11";
-		elsif rising_edge(clk) then
-			uart_data_in_meta <= uart_data_in_meta(0) & uart_data_in_ext;
-		end if;
-	end process;
-	uart_data_in <= uart_data_in_meta(1);
-	
-	--
-	--sync in to middle of startbit
-	--
-	process (clk,rst)
-		variable zero_cnt : integer := 0;
-	begin
-		if rst = '1' then
-			zero_cnt := 0;
-		elsif rising_edge(clk) then
-			if uart_data_in = '0' then
-				zero_cnt := zero_cnt + 1;
-			else
-				zero_cnt := 0;
-			end if;
-			
-			if zero_cnt = 1302 then
-				start_baudrate_clk <= '1';
-			else
-				start_baudrate_clk <= '0';
-			end if;
-		end if;
-	end process;	
-
-	--
-	--produce a pulse in middle of each bit
-	--
-	process(clk,rst)
-		variable uart_clk_cnt : integer := 0;
-		variable uart_bit_cnt : integer := 0;
-   begin
-		if rst = '1' then
-			uart_clk_re <= '0';
-			clkstate <= BAUDRATE_CLK_OFF;
-			uart_clk_cnt := 0;
-			uart_bit_cnt := 0;
-		elsif rising_edge(clk) then
-			parallell_data_out_valid <= '0';
-			case clkstate is
-				when BAUDRATE_CLK_OFF =>
-					if start_baudrate_clk = '1' then
-						clkstate <= BAUDRATE_CLK_ON;
-					end if;
-					uart_clk_cnt := 0;
-					uart_bit_cnt := 0;
-					uart_clk_re <= '0';
-
-				when BAUDRATE_CLK_ON =>
-					--50M/(19200)=2604.16
-					--TODO: fix average frequency
-					if(uart_clk_cnt = 2604) then
-						if uart_bit_cnt /= 8 then
-							uart_clk_re <= '1';
-						end if;
-						uart_bit_cnt := uart_bit_cnt + 1;
-						uart_clk_cnt := 0;
-					else
-						uart_clk_re <= '0';
-						uart_clk_cnt := uart_clk_cnt + 1;
-					end if;
-					
-					if uart_bit_cnt = 9 then
-						clkstate <= BAUDRATE_CLK_OFF;
-						parallell_data_out_valid <= '1';
-					end if;
-			end case;
-		end if;
-	end process;
 	
 	--
 	-- sample uart data
@@ -161,11 +76,30 @@ begin
 	process(clk,rst)
 	begin
 		if rst = '1' then
-			parallell_data_out <= (others => '0');
+			uartstate <= IDLE;
+			rts_screen <= '0';
+			rts_track <= '0';
 		elsif rising_edge(clk) then
-			if uart_clk_re = '1' then
-				parallell_data_out <= uart_data_in & parallell_data_out(7 downto 1);
-			end if;	
+		   rts_screen <= '0';
+			rts_track <= '0';
+		   case uartstate is
+				when IDLE =>
+					if datarec_screen = '1' then
+						uartstate <= STORE_FROM_SCREEN;
+					elsif datarec_track = '1' then
+					   uartstate <= STORE_FROM_TRACK;
+					end if;
+				when STORE_FROM_SCREEN =>
+				   uartstate <= SEND_TO_TRACK;
+				when STORE_FROM_TRACK =>
+				   uartstate <= SEND_TO_SCREEN;
+				when SEND_TO_TRACK =>
+				   rts_track <= '1';
+				   uartstate <= IDLE;
+				when SEND_TO_SCREEN =>
+				   rts_screen <= '1';
+				   uartstate <= IDLE;
+			end case;
 		end if; 
 	end process;
 	
