@@ -130,8 +130,15 @@ architecture syn of sc_fpga is
 			writer_address	: in  std_logic_vector(7 downto 0);
 			writer_enable	: in  std_logic;
 			
+			writer2_data	: in  std_logic_vector(7 downto 0);
+			writer2_address: in  std_logic_vector(7 downto 0);
+			writer2_enable	: in  std_logic;
+			
 			reader_data    : out std_logic_vector(7 downto 0);
-			reader_address : in  std_logic_vector(7 downto 0)
+			reader_address : in  std_logic_vector(7 downto 0);
+			
+			reader2_data    : out std_logic_vector(7 downto 0);
+			reader2_address : in  std_logic_vector(7 downto 0)
        );
 	end component;
 	
@@ -154,12 +161,25 @@ architecture syn of sc_fpga is
 	
 	component uart_controller
    port ( 
-	      clk                      : in   std_logic;
-	  		rst                      : in   std_logic;
+         clk                      : in   std_logic;
+			rst                      : in   std_logic;
+			
 			rts_screen               : out  std_logic;
 			datarec_screen           : in   std_logic;
+			data_from_screen         : in   std_logic_vector(7 downto 0);
+			data_to_screen           : out  std_logic_vector(7 downto 0);
+			
+			write_address            : out  std_logic_vector(7 downto 0);
+			write_data               : out  std_logic_vector(7 downto 0);
+			write_en                 : out  std_logic;
+			
+			read_address             : out  std_logic_vector(7 downto 0);
+			read_data                : in   std_logic_vector(7 downto 0);
+			
 			rts_track                : out  std_logic;
-			datarec_track            : in   std_logic
+			datarec_track            : in   std_logic;
+			data_from_track          : in   std_logic_vector(7 downto 0);
+			data_to_track            : out  std_logic_vector(7 downto 0)
         );
    end component uart_controller;
 	
@@ -172,9 +192,18 @@ architecture syn of sc_fpga is
 	 signal spidata_to_master         	: std_logic_vector(7 downto 0); 
 	 signal spidata_valid_from_master 	: std_logic;
 	 constant VERSION                 	: std_logic_vector(7 downto 0):= "00001000";
-	 signal rs485data_from_powerbase		: std_logic_vector(7 downto 0);
-	 signal rs485address_from_powerbase	: std_logic_vector(7 downto 0);
-	 signal rs485data_enable				: std_logic;
+	 
+	 signal uart_controller_to_rf_write_data		      : std_logic_vector(7 downto 0);
+	 signal uart_controller_to_rf_write_address	      : std_logic_vector(7 downto 0);
+	 signal uart_controller_to_rf_write_valid	         : std_logic;
+	 
+	 signal rf_to_uart_controller_read_address 			: std_logic_vector(7 downto 0);
+	 signal rf_to_uart_controller_read_data 				: std_logic_vector(7 downto 0);
+	 
+	 signal spi_decoder_to_rf_data		: std_logic_vector(7 downto 0);
+	 signal spi_decoder_to_rf_address	: std_logic_vector(7 downto 0);
+	 signal spi_decoder_to_rf_valid	   : std_logic;
+	 
 	 signal rs485data_to_spi				: std_logic_vector(7 downto 0);
 	 signal rs485address_to_spi			: std_logic_vector(7 downto 0);
 	 
@@ -227,22 +256,32 @@ begin
 						pll_locked 			=> pll_locked,
 						version 				=> VERSION,
 						leds 					=> open, --LED_GREEN,
-						extreg_dataout		=> rs485data_from_powerbase, --should later come from rs485 block
-						extreg_addressout	=> rs485address_from_powerbase, --should later come from rs485 block
-						extreg_enable		=> rs485data_enable,
+						extreg_dataout		=> spi_decoder_to_rf_data, --should later come from rs485 block
+						extreg_addressout	=> spi_decoder_to_rf_address, --should later come from rs485 block
+						extreg_enable		=> spi_decoder_to_rf_valid,
 						extreg_datain		=> rs485data_to_spi,
 						extreg_addressin	=> rs485address_to_spi
                );
 					
    inst_registerfile : registerfile
 		port map( 
-						clk				=> clk,
-						rst				=> rst,
-						writer_data		=> rs485data_from_powerbase,
-						writer_address	=> rs485address_from_powerbase,
-						writer_enable	=> rs485data_enable,
-						reader_data		=> rs485data_to_spi,
-						reader_address => rs485address_to_spi
+						clk				 => clk,
+						rst				 => rst,
+						
+						writer_data		 => spi_decoder_to_rf_data,
+						writer_address	 => spi_decoder_to_rf_address,
+						writer_enable	 => spi_decoder_to_rf_valid,
+						
+						writer2_data	 => uart_controller_to_rf_write_data,
+						writer2_address => uart_controller_to_rf_write_address,
+						writer2_enable	 => uart_controller_to_rf_write_valid,
+						
+						reader_data		 => rs485data_to_spi,
+						reader_address  => rs485address_to_spi,
+						
+						reader2_data    => rf_to_uart_controller_read_data,
+						reader2_address => rf_to_uart_controller_read_address
+						
        );
 	inst_UART0 : uart_halfduplex
 		port map( 
@@ -273,15 +312,26 @@ begin
        );
 	inst_UART_CONTROLLER : uart_controller
 	   port map(
-		            clk                      => clk,
+						clk                      => clk,
 	  		         rst                      => rst,
 			         rts_screen               => UART1_parallell_data_in_valid,
-			         datarec_screen           => UART1_parallell_data_out_valid,
-			         rts_track                => UART0_parallell_data_in_valid,
-			         datarec_track            => UART0_parallell_data_out_valid
+						datarec_screen           => UART1_parallell_data_out_valid,
+						data_from_screen         => UART1_parallell_data_out,
+						data_to_screen           => UART1_parallell_data_in,
+				
+						write_address            => uart_controller_to_rf_write_address,
+						write_data               => uart_controller_to_rf_write_data,
+						write_en                 => uart_controller_to_rf_write_valid,
+				
+						read_address             => rf_to_uart_controller_read_address,
+						read_data                => rf_to_uart_controller_read_data,
+				
+						rts_track                => UART0_parallell_data_in_valid,
+						datarec_track            => UART0_parallell_data_out_valid,
+						data_from_track          => UART0_parallell_data_out,
+						data_to_track            => UART0_parallell_data_in
        );
 
-		 
 --async trigg of reset, sync release
 process(clk,pll_locked)
 begin
@@ -296,16 +346,16 @@ begin
 	end if;
 end process;	
 
- UART1_parallell_data_in <= UART0_parallell_data_out;
- UART0_parallell_data_in <= UART1_parallell_data_out;
+ --UART1_parallell_data_in <= UART0_parallell_data_out;
+ --UART0_parallell_data_in <= UART1_parallell_data_out;
  
 	--SS_out   <= '0';
 	--SCLK_out <= '0';
 	MOSI_out <= '0';
 	MISO_out <= '0';
 	
-	
-	LED_GREEN <= UART1_parallell_data_in;
+	LED_GREEN <= uart_controller_to_rf_write_address;
+--	LED_GREEN <= UART1_parallell_data_in;
    
 end architecture syn;
 

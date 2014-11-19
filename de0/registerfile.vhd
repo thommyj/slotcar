@@ -55,8 +55,15 @@ entity registerfile is
 			writer_address	: in  std_logic_vector(7 downto 0);
 			writer_enable	: in  std_logic;
 			
+			writer2_data	: in  std_logic_vector(7 downto 0);
+			writer2_address: in  std_logic_vector(7 downto 0);
+			writer2_enable	: in  std_logic;
+			
 			reader_data   : out std_logic_vector(7 downto 0);
-			reader_address: in  std_logic_vector(7 downto 0)
+			reader_address: in  std_logic_vector(7 downto 0);
+			
+			reader2_data    : out std_logic_vector(7 downto 0);
+			reader2_address : in  std_logic_vector(7 downto 0)
        );
 end entity registerfile;
 
@@ -79,23 +86,35 @@ begin
 	if(rst = '1') then 
 		registers <= (others=> (others=>'0'));
 	elsif rising_edge(clk) then
+	
+		reader_data <= registers(to_integer(unsigned(reader_address)));
+		reader2_data <= registers(to_integer(unsigned(reader2_address)));
 		
-		--if write request from writer
 		if (writer_enable = '1') then
-			if(to_integer(unsigned(writer_address)) < 23) then
-				registers(to_integer(unsigned(writer_address))) <= writer_data;
-			end if;
+			registers(to_integer(unsigned(writer_address))) <= writer_data;
 			
 			--if reader request same address as writer is write to,
 			--shortcut data
-			--if(reader_address = writer_address) then
-			--	reader_data <= writer_data;
-			--end if;
+			if(reader_address = writer_address) then
+				reader_data <= writer_data;
+			end if;
+			
+			if(reader2_address = writer_address) then
+				reader2_data <= writer_data;
+			end if;
+			
+		elsif (writer2_enable = '1') then
+			registers(to_integer(unsigned(writer2_address))) <= writer2_data;
+			
+			if(reader_address = writer2_address) then
+				reader_data <= writer2_data;
+			end if;
+			if(reader2_address = writer2_address) then
+				reader2_data <= writer2_data;
+			end if;
 		end if;
 	end if;
 end process;
-
-reader_data <= registers(to_integer(unsigned(reader_address)));
 
 end architecture syn;
 -- *** EOF ***

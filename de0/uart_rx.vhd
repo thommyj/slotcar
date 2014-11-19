@@ -122,6 +122,7 @@ begin
 			clkstate <= BAUDRATE_CLK_OFF;
 			uart_clk_cnt := 0;
 			uart_bit_cnt := 0;
+			parallell_data_out_valid <= '0';
 		elsif rising_edge(clk) then
 			parallell_data_out_valid <= '0';
 			case clkstate is

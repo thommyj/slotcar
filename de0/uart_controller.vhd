@@ -51,10 +51,23 @@ entity uart_controller is
    port( 
          clk                      : in   std_logic;
 			rst                      : in   std_logic;
+			
 			rts_screen               : out  std_logic;
 			datarec_screen           : in   std_logic;
+			data_from_screen         : in   std_logic_vector(7 downto 0);
+			data_to_screen           : out   std_logic_vector(7 downto 0);
+			
+			write_address            : out  std_logic_vector(7 downto 0);
+			write_data               : out  std_logic_vector(7 downto 0);
+			write_en                 : out  std_logic;
+			
+			read_address             : out  std_logic_vector(7 downto 0);
+			read_data                : in   std_logic_vector(7 downto 0);
+			
 			rts_track                : out  std_logic;
-			datarec_track            : in   std_logic
+			datarec_track            : in   std_logic;
+			data_from_track          : in   std_logic_vector(7 downto 0);
+			data_to_track            : out  std_logic_vector(7 downto 0)
 			);
 end entity uart_controller;
 
@@ -64,11 +77,15 @@ end entity uart_controller;
 
 architecture syn of uart_controller is
 
-	type uartstate_type is (IDLE, STORE_FROM_SCREEN, STORE_FROM_TRACK, SEND_TO_SCREEN, SEND_TO_TRACK);
-	signal uartstate : uartstate_type;
+	type uartstate_type is (IDLE, SEND_TO_SCREEN, SEND_TO_TRACK);
+	signal uartstate    : uartstate_type;
 	
+	
+	signal address      : integer;
 begin
 
+	read_address <= std_logic_vector(to_unsigned(address, read_address'length));
+	write_address <= std_logic_vector(to_unsigned(address, write_address'length));
 	
 	--
 	-- sample uart data
@@ -79,26 +96,52 @@ begin
 			uartstate <= IDLE;
 			rts_screen <= '0';
 			rts_track <= '0';
+			address <= 0;
 		elsif rising_edge(clk) then
 		   rts_screen <= '0';
 			rts_track <= '0';
-		   case uartstate is
-				when IDLE =>
+			write_en <= '0';
+			
+			
+
+					
+			case uartstate is
+				when IDLE =>					
 					if datarec_screen = '1' then
-						uartstate <= STORE_FROM_SCREEN;
+						uartstate   <= SEND_TO_TRACK;
+						
+						address     <= address + 1;
+						write_en    <= '1';
+						write_data  <= data_from_screen;
+						
 					elsif datarec_track = '1' then
-					   uartstate <= STORE_FROM_TRACK;
+						uartstate   <= SEND_TO_SCREEN;
+						
+						address     <= address + 1;
+						write_en    <= '1';
+						write_data  <= data_from_track;
+						
 					end if;
-				when STORE_FROM_SCREEN =>
-				   uartstate <= SEND_TO_TRACK;
-				when STORE_FROM_TRACK =>
-				   uartstate <= SEND_TO_SCREEN;
 				when SEND_TO_TRACK =>
-				   rts_track <= '1';
-				   uartstate <= IDLE;
+					uartstate      <= IDLE;
+					
+				   rts_track      <= '1';
+					data_to_track  <= read_data;
+					
+					if (address = 22) then 
+						address <= 0;
+					end if;
+					
 				when SEND_TO_SCREEN =>
-				   rts_screen <= '1';
-				   uartstate <= IDLE;
+				   uartstate      <= IDLE;
+					
+				   rts_screen     <= '1';
+					data_to_screen <= read_data;
+					
+					if (address = 22) then 
+						address <= 0;
+					end if;
+					
 			end case;
 		end if; 
 	end process;
