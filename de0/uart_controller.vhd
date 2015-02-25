@@ -128,7 +128,7 @@ begin
 				   rts_track      <= '1';
 					data_to_track  <= read_data;
 					
-					if (address = 22) then 
+					if (address = 23) then 
 						address <= 0;
 					end if;
 					
@@ -138,7 +138,7 @@ begin
 				   rts_screen     <= '1';
 					data_to_screen <= read_data;
 					
-					if (address = 22) then 
+					if (address = 23) then 
 						address <= 0;
 					end if;
 					

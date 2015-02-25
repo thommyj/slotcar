@@ -63,10 +63,10 @@ entity sc_fpga is
 			MISO_out      : out std_logic;
 			UART0_out	  : out std_logic;
 			UART0_in	     : in std_logic;
---			UART0_rts     : out std_logic;
+			UART0_rts     : out std_logic;
 			UART1_out	  : out std_logic;
-			UART1_in	     : in std_logic
---			UART1_rts     : out std_logic
+			UART1_in	     : in std_logic;
+			UART1_rts     : out std_logic
        );
 end entity sc_fpga;
 
@@ -294,7 +294,7 @@ begin
 						parallell_data_in_valid  => UART0_parallell_data_in_valid,
 						parallell_data_in_sent   => UART0_parallell_data_in_sent,
 						uart_data_out				 => UART0_out,
-						rts							 => open
+						rts							 => UART0_rts
        );
 		 
 	inst_UART1 : uart_halfduplex
@@ -308,7 +308,7 @@ begin
 						parallell_data_in_valid  => UART1_parallell_data_in_valid,
 						parallell_data_in_sent   => UART1_parallell_data_in_sent,
 						uart_data_out				 => UART1_out,
-						rts							 => open
+						rts							 => UART1_rts
        );
 	inst_UART_CONTROLLER : uart_controller
 	   port map(
