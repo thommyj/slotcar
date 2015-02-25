@@ -61,8 +61,10 @@ entity uart_controller is
 			write_data               : out  std_logic_vector(7 downto 0);
 			write_en                 : out  std_logic;
 			
+			read_req						 : out  std_logic;
 			read_address             : out  std_logic_vector(7 downto 0);
 			read_data                : in   std_logic_vector(7 downto 0);
+			read_data_valid			 : in   std_logic;
 			
 			rts_track                : out  std_logic;
 			datarec_track            : in   std_logic;
@@ -97,51 +99,60 @@ begin
 			rts_screen <= '0';
 			rts_track <= '0';
 			address <= 0;
+			write_en <= '0';
+			read_req <= '0';
 		elsif rising_edge(clk) then
 		   rts_screen <= '0';
 			rts_track <= '0';
 			write_en <= '0';
-			
-			
-
-					
+			read_req <= '0';
+								
 			case uartstate is
 				when IDLE =>					
 					if datarec_screen = '1' then
 						uartstate   <= SEND_TO_TRACK;
 						
-						address     <= address + 1;
+						read_req    <= '1';
 						write_en    <= '1';
 						write_data  <= data_from_screen;
-						
+	
+						--address     <= address + 1;	
 					elsif datarec_track = '1' then
 						uartstate   <= SEND_TO_SCREEN;
 						
-						address     <= address + 1;
+						read_req    <= '1';
 						write_en    <= '1';
 						write_data  <= data_from_track;
 						
+						--address     <= address + 1;						
 					end if;
 				when SEND_TO_TRACK =>
-					uartstate      <= IDLE;
-					
-				   rts_track      <= '1';
-					data_to_track  <= read_data;
-					
-					if (address = 23) then 
-						address <= 0;
+					if (read_data_valid = '1') then
+						uartstate      <= IDLE;
+						
+						rts_track      <= '1';
+						data_to_track  <= read_data;
+						
+						address     <= address + 1;
+						
+						if (address = 23) then 
+							address <= 0;
+						end if;
 					end if;
 					
 				when SEND_TO_SCREEN =>
-				   uartstate      <= IDLE;
-					
-				   rts_screen     <= '1';
-					data_to_screen <= read_data;
-					
-					if (address = 23) then 
-						address <= 0;
+					if (read_data_valid = '1') then
+						uartstate      <= IDLE;
+						
+						rts_screen     <= '1';
+						data_to_screen <= read_data;
+						
+						address     <= address + 1;
+						
+						if (address = 23) then 
+							address <= 0;
+						end if;
 					end if;
-					
 			end case;
 		end if; 
 	end process;

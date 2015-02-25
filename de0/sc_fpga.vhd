@@ -113,10 +113,14 @@ architecture syn of sc_fpga is
 			leds					: out std_logic_vector(7 downto 0);
 			pll_locked        : in  std_logic;
 			version           : in  std_logic_vector(7 downto 0);
+			
 			extreg_dataout		: out std_logic_vector(7 downto 0);
 			extreg_addressout	: out std_logic_vector(7 downto 0);
+			extreg_read_req   : out std_logic;
 			extreg_enable		: out std_logic;
+			
 			extreg_datain		: in std_logic_vector(7 downto 0);
+			extreg_data_valid : in std_logic;
 			extreg_addressin	: out std_logic_vector(7 downto 0)
        );
 	end component;
@@ -134,11 +138,15 @@ architecture syn of sc_fpga is
 			writer2_address: in  std_logic_vector(7 downto 0);
 			writer2_enable	: in  std_logic;
 			
-			reader_data    : out std_logic_vector(7 downto 0);
-			reader_address : in  std_logic_vector(7 downto 0);
+			reader_data        : out std_logic_vector(7 downto 0);
+			reader_data_valid  : out std_logic;
+			reader_read_req	 : in std_logic;
+			reader_address     : in  std_logic_vector(7 downto 0);
 			
-			reader2_data    : out std_logic_vector(7 downto 0);
-			reader2_address : in  std_logic_vector(7 downto 0)
+			reader2_data       : out std_logic_vector(7 downto 0);
+			reader2_data_valid : out std_logic;
+			reader2_read_req	 : in std_logic;
+			reader2_address    : in  std_logic_vector(7 downto 0)
        );
 	end component;
 	
@@ -173,8 +181,10 @@ architecture syn of sc_fpga is
 			write_data               : out  std_logic_vector(7 downto 0);
 			write_en                 : out  std_logic;
 			
+			read_req						 : out  std_logic;
 			read_address             : out  std_logic_vector(7 downto 0);
 			read_data                : in   std_logic_vector(7 downto 0);
+			read_data_valid			 : in   std_logic;
 			
 			rts_track                : out  std_logic;
 			datarec_track            : in   std_logic;
@@ -197,14 +207,18 @@ architecture syn of sc_fpga is
 	 signal uart_controller_to_rf_write_address	      : std_logic_vector(7 downto 0);
 	 signal uart_controller_to_rf_write_valid	         : std_logic;
 	 
+	 signal uart_controller_to_rf_read_req					: std_logic;
 	 signal rf_to_uart_controller_read_address 			: std_logic_vector(7 downto 0);
 	 signal rf_to_uart_controller_read_data 				: std_logic_vector(7 downto 0);
+	 signal rf_to_uart_controller_data_valid 				: std_logic;
 	 
+	 signal spi_decoder_to_rf_data_valid	   : std_logic;
 	 signal spi_decoder_to_rf_data		: std_logic_vector(7 downto 0);
+	 signal rf_to_spi_decoder_read_req  : std_logic;
 	 signal spi_decoder_to_rf_address	: std_logic_vector(7 downto 0);
-	 signal spi_decoder_to_rf_valid	   : std_logic;
 	 
 	 signal rs485data_to_spi				: std_logic_vector(7 downto 0);
+	 signal rf_to_spi_decoder_data_valid : std_logic;
 	 signal rs485address_to_spi			: std_logic_vector(7 downto 0);
 	 
 	 --UART
@@ -258,8 +272,10 @@ begin
 						leds 					=> LED_GREEN,
 						extreg_dataout		=> spi_decoder_to_rf_data, --should later come from rs485 block
 						extreg_addressout	=> spi_decoder_to_rf_address, --should later come from rs485 block
-						extreg_enable		=> spi_decoder_to_rf_valid,
+						extreg_read_req   => rf_to_spi_decoder_read_req,
+						extreg_enable		=> spi_decoder_to_rf_data_valid,
 						extreg_datain		=> rs485data_to_spi,
+						extreg_data_valid => rf_to_spi_decoder_data_valid,
 						extreg_addressin	=> rs485address_to_spi
                );
 					
@@ -270,16 +286,20 @@ begin
 						
 						writer_data		 => spi_decoder_to_rf_data,
 						writer_address	 => spi_decoder_to_rf_address,
-						writer_enable	 => spi_decoder_to_rf_valid,
+						writer_enable	 => spi_decoder_to_rf_data_valid,
 						
 						writer2_data	 => uart_controller_to_rf_write_data,
 						writer2_address => uart_controller_to_rf_write_address,
 						writer2_enable	 => uart_controller_to_rf_write_valid,
 						
+						reader_read_req => rf_to_spi_decoder_read_req,
 						reader_data		 => rs485data_to_spi,
+						reader_data_valid => rf_to_spi_decoder_data_valid,
 						reader_address  => rs485address_to_spi,
 						
+						reader2_read_req => uart_controller_to_rf_read_req,
 						reader2_data    => rf_to_uart_controller_read_data,
+						reader2_data_valid => rf_to_uart_controller_data_valid,
 						reader2_address => rf_to_uart_controller_read_address
 						
        );
@@ -323,8 +343,10 @@ begin
 						write_data               => uart_controller_to_rf_write_data,
 						write_en                 => uart_controller_to_rf_write_valid,
 				
+						read_req						 => uart_controller_to_rf_read_req,
 						read_address             => rf_to_uart_controller_read_address,
 						read_data                => rf_to_uart_controller_read_data,
+						read_data_valid			 => rf_to_uart_controller_data_valid,
 				
 						rts_track                => UART0_parallell_data_in_valid,
 						datarec_track            => UART0_parallell_data_out_valid,
@@ -356,6 +378,7 @@ end process;
 	
 --	LED_GREEN <= uart_controller_to_rf_write_address;
 --	LED_GREEN <= UART1_parallell_data_in;
+--	LED_GREEN <= UART0_parallell_data_out;
    
 end architecture syn;
 

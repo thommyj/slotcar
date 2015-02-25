@@ -59,11 +59,15 @@ entity registerfile is
 			writer2_address: in  std_logic_vector(7 downto 0);
 			writer2_enable	: in  std_logic;
 			
-			reader_data   : out std_logic_vector(7 downto 0);
-			reader_address: in  std_logic_vector(7 downto 0);
+			reader_data        : out std_logic_vector(7 downto 0);
+			reader_data_valid  : out std_logic;
+			reader_read_req	 : in std_logic;
+			reader_address     : in  std_logic_vector(7 downto 0);
 			
-			reader2_data    : out std_logic_vector(7 downto 0);
-			reader2_address : in  std_logic_vector(7 downto 0)
+			reader2_data       : out std_logic_vector(7 downto 0);
+			reader2_data_valid : out std_logic;
+			reader2_read_req	 : in std_logic;
+			reader2_address    : in  std_logic_vector(7 downto 0)
        );
 end entity registerfile;
 
@@ -85,10 +89,21 @@ process(clk,rst)
 begin
 	if(rst = '1') then 
 		registers <= (others=> (others=>'0'));
+		reader_data_valid <= '0';
+		reader2_data_valid <= '0';
 	elsif rising_edge(clk) then
-	
-		reader_data <= registers(to_integer(unsigned(reader_address)));
-		reader2_data <= registers(to_integer(unsigned(reader2_address)));
+		reader_data_valid <= '0';
+		reader2_data_valid <= '0';
+
+		if (reader_read_req = '1') then
+			reader_data <= registers(to_integer(unsigned(reader_address)));
+			reader_data_valid <= '1';
+		end if;
+		
+		if (reader2_read_req = '1') then
+			reader2_data <= registers(to_integer(unsigned(reader2_address)));
+			reader2_data_valid <= '1';
+		end if;
 		
 		if (writer_enable = '1') then
 			registers(to_integer(unsigned(writer_address))) <= writer_data;

@@ -61,9 +61,11 @@ entity spi_decoder is
 			
 			extreg_dataout		: out std_logic_vector(7 downto 0);
 			extreg_addressout	: out std_logic_vector(7 downto 0);
+			extreg_read_req   : out std_logic;
 			extreg_enable		: out std_logic;
 			
 			extreg_datain		: in std_logic_vector(7 downto 0);
+			extreg_data_valid : in std_logic;
 			extreg_addressin	: out std_logic_vector(7 downto 0)
        );
 end entity spi_decoder;
@@ -135,9 +137,11 @@ begin
 		extreg_dataout		<= (others => '0');
 		extreg_addressout	<= (others => '0');
 		extreg_enable		<= '0';
+		extreg_read_req   <= '0';
 	
 	elsif rising_edge(clk) then
 		extreg_enable		<= '0'; --external write only needs one cycle
+		extreg_read_req   <= '0';
 		
 		case state is
 		---------IDLE--------------
@@ -157,6 +161,7 @@ begin
 						out_content <= SPIOUT_INTERNAL;
 					else --external registers, need an extra clkcycle
 						state <= SPISTATE_READ_WAITFORDATA;			
+						extreg_read_req <= '1';
 						out_content <= SPIOUT_ERROR;
 						--in reality even fewer registers, but we have 6 address bits
 						--so lets send them. If user exceeds limits register file will
@@ -215,10 +220,11 @@ begin
 		when SPISTATE_READ_WAITFORDATA =>
 			--address to registerfile was put out last cycle,
 			--data should be available now
-			ext_reg_out <= extreg_datain;
-			state <= SPISTATE_READ_WAITFORDONE;
-			out_content <= SPIOUT_EXTERNAL;
-			
+			if(extreg_data_valid = '1') then
+				ext_reg_out <= extreg_datain;
+				state <= SPISTATE_READ_WAITFORDONE;
+				out_content <= SPIOUT_EXTERNAL;
+			end if;
 		end case;
 	end if; --if reset
 end process;
