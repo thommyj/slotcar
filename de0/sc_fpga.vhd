@@ -255,7 +255,7 @@ begin
 						spidata_valid_in 	=> spidata_valid_from_master,
 						pll_locked 			=> pll_locked,
 						version 				=> VERSION,
-						leds 					=> open, --LED_GREEN,
+						leds 					=> LED_GREEN,
 						extreg_dataout		=> spi_decoder_to_rf_data, --should later come from rs485 block
 						extreg_addressout	=> spi_decoder_to_rf_address, --should later come from rs485 block
 						extreg_enable		=> spi_decoder_to_rf_valid,
@@ -354,7 +354,7 @@ end process;
 	MOSI_out <= '0';
 	MISO_out <= '0';
 	
-	LED_GREEN <= uart_controller_to_rf_write_address;
+--	LED_GREEN <= uart_controller_to_rf_write_address;
 --	LED_GREEN <= UART1_parallell_data_in;
    
 end architecture syn;

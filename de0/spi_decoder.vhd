@@ -114,8 +114,8 @@ architecture syn of spi_decoder is
 	---0x00, version register r
 	---0x01, status r
 	---0x02, config r/w,
-	   --bit7 - 1, reserved
-	   --bit0, led output. 1b0 = spi data from master, 1b1 = led register
+	   --bit7:2, reserved
+		--bit1:0, led output. 2b00 = version, 2b01 = raw spi data from master, 2b10 = SPI state, 2b11 = led register
 	---0x03, leds r/w
 	
 	--External registers
@@ -237,10 +237,13 @@ end process;
 								config_reg	when "000010",
 								led_reg		when "000011", 
 								x"FF" when others;
-								
-	with config_reg(0) select
-		leds <= 	led_states	when '0',
-					led_reg		when '1';
+							
+	--bit1:0, led output. 2b00 = version, 2b01 = raw spi data from master, 2b10 = SPI state, 2b11 = led register
+	with config_reg(1 downto 0) select
+		leds <= 	version		when "00",
+					spidata_in  when "01",
+					led_states	when "10",
+					led_reg		when "11";
 
 	with state select
 		led_states <= x"01" when SPISTATE_IDLE,
