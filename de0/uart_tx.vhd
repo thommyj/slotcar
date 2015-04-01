@@ -66,80 +66,99 @@ end entity txuart;
 architecture syn of txuart is
 
 	type sendstate_type is (TXSTATE_IDLE, TXSTATE_START, TXSTATE_DATA, TXSTATE_STOP);
-   signal uart_clk_re  : std_logic;
-	signal send_state : sendstate_type;
-	signal send_data : std_logic_vector(7 downto 0);
+	signal send_state  : sendstate_type;
+	type clkstate_type is (CLKSTATE_IDLE, CLKSTATE_COUNTING);
+	signal clk_state  : clkstate_type;
+	signal send_data   : std_logic_vector(7 downto 0);
+	signal uart_clk_re : std_logic;
 
 
 	
 begin
 
-	--
-	--produce clk at the baudrate
-	--
-	process(clk,rst)
+	process(clk, rst)
 		variable uart_clk_cnt : integer := 0;
-   begin
+	begin
 		if rst = '1' then
-			uart_clk_re <= '0';
 			uart_clk_cnt := 0;
+			uart_clk_re  <= '0';
 		elsif rising_edge(clk) then
-			--50M/(19200)=2604.16
-			--TODO: fix average frequency
-			if send_state = TXSTATE_IDLE or uart_clk_cnt = 2604 then
-				uart_clk_re <= '1';
-				uart_clk_cnt := 0;
-			else
-				uart_clk_re <= '0';
-				uart_clk_cnt := uart_clk_cnt + 1;
-			end if;
+		
+			case clk_state is
+				when CLKSTATE_IDLE =>
+					uart_clk_cnt := 0;
+					uart_clk_re  <= '0';
+				when CLKSTATE_COUNTING =>
+					--TODO: fix average frequency
+					if uart_clk_cnt = 2604 then
+						uart_clk_re <= '1';
+						uart_clk_cnt := 0;
+					else
+						uart_clk_re <= '0';
+						uart_clk_cnt := uart_clk_cnt + 1;
+					end if;
+			end case;
 		end if;
 	end process;
-	
+
 	--
 	-- when data_in_valid goes high, start sending out data
 	--
 	process(clk,rst)
-		variable send_cnt  : integer := 0;
+		variable send_cnt     : integer   := 0;
 	begin
 		if rst = '1' then
 				send_state <= TXSTATE_IDLE;
-				send_cnt  := 0;
+				clk_state  <= CLKSTATE_IDLE;
+				send_cnt   := 0;
+				
 				uart_data_out <= '1';
 				parallell_data_in_sent <= '0';
 				busy <= '0';
 		elsif rising_edge(clk) then
-			if uart_clk_re = '1' then
-				case send_state is
-					when TXSTATE_IDLE =>
-						send_cnt  := 0;
-						uart_data_out <= '1'; --high during idle
-						parallell_data_in_sent <= '0';
-						busy <= '0';
-						
-						if(parallell_data_in_valid = '1') then
-							send_state <= TXSTATE_START;
-							busy <= '1';
-							send_data <= parallell_data_in;
-						end if;
+			parallell_data_in_sent <= '0';
+			
+			case send_state is
+				when TXSTATE_IDLE =>
+					uart_data_out <= '1'; --high during idle
+					busy <= '0';
+					clk_state <= CLKSTATE_IDLE;
+
+					send_cnt  := 0;
+							
+					if(parallell_data_in_valid = '1') then
+						send_state <= TXSTATE_START;
+						clk_state  <= CLKSTATE_COUNTING; --restart UART clock
+						busy <= '1';
+						send_data <= parallell_data_in;
+					end if;
 					
-					when TXSTATE_START =>
-						uart_data_out <= '0'; --start bit low
-						send_state <= TXSTATE_DATA;
+				when TXSTATE_START =>
+					uart_data_out <= '0'; --start bit low
+					
+					if uart_clk_re = '1' then
+						send_state    <= TXSTATE_DATA;
+					end if;
 						
-					when TXSTATE_DATA =>
-						uart_data_out <= send_data(send_cnt);
+				when TXSTATE_DATA =>
+					uart_data_out <= send_data(send_cnt);
+					
+					if uart_clk_re = '1' then
 						send_cnt := send_cnt + 1;
 						if(send_cnt > 7) then
 							send_state <= TXSTATE_STOP;
 						end if;
+					end if;
 						
-					when TXSTATE_STOP =>
-						uart_data_out <= '1';  --stop bit high
+				when TXSTATE_STOP =>
+					uart_data_out <= '1';  --stop bit high
+					
+					if uart_clk_re = '1' then
 						parallell_data_in_sent <= '1'; --transmit done
 						send_state <= TXSTATE_IDLE;
-				end case;
-			end if;	
+						busy <= '0';
+					end if;
+			end case;
 		end if; 
 	end process;
 	

@@ -201,7 +201,7 @@ architecture syn of sc_fpga is
 	 signal spidata_from_master       	: std_logic_vector(7 downto 0);
 	 signal spidata_to_master         	: std_logic_vector(7 downto 0); 
 	 signal spidata_valid_from_master 	: std_logic;
-	 constant VERSION                 	: std_logic_vector(7 downto 0):= "00001000";
+	 constant VERSION                 	: std_logic_vector(7 downto 0):= "00001001";
 	 
 	 signal uart_controller_to_rf_write_data		      : std_logic_vector(7 downto 0);
 	 signal uart_controller_to_rf_write_address	      : std_logic_vector(7 downto 0);
